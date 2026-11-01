@@ -1,0 +1,14 @@
+node_modules/
+dist/
+data/
+signing/
+*.log
+*.db
+*.db-wal
+*.db-shm
+*.tgz
+screenshot*.png
+.env
+.env.*
+package-lock.json
+.DS_Store

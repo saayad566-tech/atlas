@@ -1,0 +1,487 @@
+{
+  "product": "Atlas",
+  "governance": true,
+  "categories": [
+    {
+      "name": "Screening & Discovery",
+      "owner": "core",
+      "last_reviewed": "2026-10-27",
+      "modules": [
+        {
+          "name": "Expression screener",
+          "features": [
+            "tokenizer \u2192 AST \u2192 parameterised SQL",
+            "field whitelist",
+            "10 presets",
+            "saved screens"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Natural-language query",
+          "features": [
+            "rule-based parser",
+            "optional Ollama fallback validated by the compiler"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Ranking & factors",
+          "features": [
+            "factor scores",
+            "universe ranking",
+            "sector percentiles with thin-sector fallback"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Etc. / Additional Assets",
+          "features": [
+            "CSV export",
+            "enriched CSV export"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        }
+      ]
+    },
+    {
+      "name": "Company Analysis",
+      "owner": "core",
+      "last_reviewed": "2026-10-27",
+      "modules": [
+        {
+          "name": "Statements & ratios",
+          "features": [
+            "annual + quarterly",
+            "10y history",
+            "ratio recomputation per period"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Scores",
+          "features": [
+            "Piotroski F",
+            "Altman Z",
+            "Beneish M",
+            "composite grade"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Deep metrics",
+          "features": [
+            "DuPont",
+            "cash conversion cycle",
+            "CAGR 3Y",
+            "red-flag analysis"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Deep analysis v2",
+          "features": [
+            "ROIC",
+            "EVA",
+            "reinvestment rate",
+            "growth quality",
+            "trends",
+            "anomalies",
+            "data-quality score",
+            "scorecard"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Valuation lab",
+          "features": [
+            "5 models",
+            "editable assumptions",
+            "scenarios",
+            "blend",
+            "bear/base/bull",
+            "P/E band",
+            "Markdown report"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Balance-sheet strength",
+          "features": [
+            "net debt / EBITDA",
+            "interest cover",
+            "verdict"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Company intelligence",
+          "features": [
+            "description",
+            "segments",
+            "order book",
+            "guidance vs actual",
+            "facilities",
+            "risks",
+            "moat score"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Feature audit",
+          "features": [
+            "24 checks per symbol",
+            "sanity/plausibility checks",
+            "pass / no-data / suspect / error"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Etc. / Additional Assets",
+          "features": [
+            "peer matrix",
+            "ratings & notes",
+            "peer overrides"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        }
+      ]
+    },
+    {
+      "name": "Market Intelligence",
+      "owner": "core",
+      "last_reviewed": "2026-10-27",
+      "modules": [
+        {
+          "name": "Prices & volume",
+          "features": [
+            "daily closes",
+            "volume",
+            "price analytics",
+            "momentum composite",
+            "volatility regime",
+            "1-day VaR"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Dividends",
+          "features": [
+            "history",
+            "TTM",
+            "yield",
+            "growth",
+            "streak",
+            "yield on cost",
+            "total return"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Analysts",
+          "features": [
+            "recommendation trend",
+            "consensus score",
+            "price targets",
+            "upside",
+            "forward estimates"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Ownership",
+          "features": [
+            "institutional %",
+            "insider %",
+            "insider transactions",
+            "net insider value"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Earnings",
+          "features": [
+            "estimates",
+            "surprises",
+            "average surprise",
+            "earnings calendar",
+            "earnings reaction"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "News",
+          "features": [
+            "Google News RSS",
+            "Yahoo RSS",
+            "stored headlines"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Etc. / Additional Assets",
+          "features": [
+            "splits",
+            "ex-dividend date",
+            "52-week range"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        }
+      ]
+    },
+    {
+      "name": "Cross-Sectional & Portfolio",
+      "owner": "core",
+      "last_reviewed": "2026-10-27",
+      "modules": [
+        {
+          "name": "Risk",
+          "features": [
+            "correlation matrix",
+            "Sharpe-like ratio",
+            "drawdown recovery",
+            "relative strength"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Market structure",
+          "features": [
+            "sector rotation",
+            "market breadth",
+            "data freshness",
+            "coverage report"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Scoring",
+          "features": [
+            "investability score A\u2013D",
+            "multi-company comparison"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Portfolio",
+          "features": [
+            "sector allocation",
+            "HHI concentration",
+            "weighted volatility",
+            "watchlist digest"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Etc. / Additional Assets",
+          "features": [
+            "alert rules",
+            "portfolio holdings"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        }
+      ]
+    },
+    {
+      "name": "Data Import",
+      "owner": "core",
+      "last_reviewed": "2026-10-27",
+      "modules": [
+        {
+          "name": "Live adapters",
+          "features": [
+            "Yahoo JSON",
+            "Yahoo RSS",
+            "Google News RSS",
+            "Wikipedia",
+            "World Bank"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Offline paths",
+          "features": [
+            "CSV import",
+            "JSON import",
+            "manual entry",
+            "deterministic generator"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Source registry",
+          "features": [
+            "15 sources catalogued",
+            "live status probe (5 states)",
+            "feature \u00d7 path matrix"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Etc. / Additional Assets",
+          "features": [
+            "backup / restore",
+            "blocked-source reporting"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        }
+      ]
+    },
+    {
+      "name": "Platform & Operations",
+      "owner": "core",
+      "last_reviewed": "2026-10-27",
+      "modules": [
+        {
+          "name": "Authentication",
+          "features": [
+            "PIN (PBKDF2-SHA256, 210k)",
+            "constant-time compare",
+            "lockout",
+            "bearer sessions",
+            "UI lock screen"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "API hardening",
+          "features": [
+            "auth gate",
+            "rate limiting",
+            "security headers",
+            "error envelope",
+            "health endpoint"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Jobs",
+          "features": [
+            "persistent queue",
+            "pacing",
+            "retry with backoff",
+            "crash recovery"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Workspaces",
+          "features": [
+            "isolated browser contexts",
+            "master \u2192 follower broadcast",
+            "10k-screen provisioning",
+            "self-diagnosis"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Etc. / Additional Assets",
+          "features": [
+            "graceful shutdown",
+            "dependency restore script",
+            "SQLite WAL"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        }
+      ]
+    },
+    {
+      "name": "Delivery & Packaging",
+      "owner": "core",
+      "last_reviewed": "2026-10-27",
+      "modules": [
+        {
+          "name": "PWA",
+          "features": [
+            "manifest start_url ./",
+            "real 192/512 PNG icons",
+            "service worker",
+            "viewport-fit=cover",
+            "relative ./ paths"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Archives",
+          "features": [
+            "flat platform zip",
+            "PWA shell zip",
+            "structure verification"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Android kit",
+          "features": [
+            "TWA manifest",
+            "assetlinks template + route",
+            "signing script",
+            "install-gate guide"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Verification suites",
+          "features": [
+            "deep audit",
+            "universe",
+            "UI",
+            "production",
+            "import",
+            "PWA",
+            "zip"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        },
+        {
+          "name": "Etc. / Additional Assets",
+          "features": [
+            "CI workflow",
+            ".gitignore",
+            "docs set"
+          ],
+          "owner": "core",
+          "last_reviewed": "2026-10-27"
+        }
+      ]
+    }
+  ]
+}

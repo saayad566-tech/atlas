@@ -1,0 +1,776 @@
+{
+  "product": "Atlas",
+  "generated": "2026-10-27",
+  "items": [
+    {
+      "id": "D01",
+      "title": "Market bundle registry (9 countries)",
+      "why": "Each market its own currency, suffix, locale, benchmark",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "D02",
+      "title": "Per-market database isolation",
+      "why": "One SQLite file per country \u2014 no cross-contamination",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "D03",
+      "title": "Bundle descriptor (db + universe + model)",
+      "why": "Downloadable pack manifest",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "D04",
+      "title": "Yahoo adapter (prices, statements, analysts, dividends, ownership)",
+      "why": "Primary free source",
+      "status": "done",
+      "effort": "L"
+    },
+    {
+      "id": "D05",
+      "title": "Google News RSS + Yahoo RSS adapters",
+      "why": "Headlines per company",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "D06",
+      "title": "Wikipedia description adapter",
+      "why": "Business descriptions",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "D07",
+      "title": "World Bank macro adapter",
+      "why": "GDP, CPI, unemployment",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "D08",
+      "title": "CSV import (statements + company-only)",
+      "why": "User-supplied universes",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "D09",
+      "title": "JSON import / backup / restore",
+      "why": "Full database round trip",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "D10",
+      "title": "Manual entry (ratings, peers, portfolio, assumptions)",
+      "why": "Always works offline",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "D11",
+      "title": "Deterministic demo generator (100% coverage)",
+      "why": "Offline fallback for every screen",
+      "status": "done",
+      "effort": "L"
+    },
+    {
+      "id": "D12",
+      "title": "Source registry with live status probing",
+      "why": "15 sources, 5 states, parallel probe",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "D13",
+      "title": "SEC EDGAR adapter",
+      "why": "Official US filings",
+      "status": "blocked",
+      "effort": "M"
+    },
+    {
+      "id": "D14",
+      "title": "NSE India adapter (shareholding, announcements)",
+      "why": "Promoter/FII/pledge",
+      "status": "blocked",
+      "effort": "M"
+    },
+    {
+      "id": "D15",
+      "title": "Stooq price history adapter",
+      "why": "Second price source",
+      "status": "blocked",
+      "effort": "S"
+    },
+    {
+      "id": "D16",
+      "title": "OpenFIGI identifier mapping",
+      "why": "Ticker \u2192 FIGI, exchange",
+      "status": "blocked",
+      "effort": "S"
+    },
+    {
+      "id": "D17",
+      "title": "GLEIF corporate hierarchy",
+      "why": "Parent/child ownership",
+      "status": "blocked",
+      "effort": "S"
+    },
+    {
+      "id": "D18",
+      "title": "Frankfurter FX adapter",
+      "why": "Closes the mixed-currency gap",
+      "status": "blocked",
+      "effort": "S"
+    },
+    {
+      "id": "D19",
+      "title": "Bulk universe sync via job queue",
+      "why": "Fetch an index end to end",
+      "status": "planned",
+      "effort": "M"
+    },
+    {
+      "id": "D20",
+      "title": "Scheduled nightly refresh",
+      "why": "Data never silently ages",
+      "status": "planned",
+      "effort": "M"
+    },
+    {
+      "id": "A01",
+      "title": "Expression screener (tokenizer \u2192 AST \u2192 SQL)",
+      "why": "Field-whitelisted, parameterised",
+      "status": "done",
+      "effort": "L"
+    },
+    {
+      "id": "A02",
+      "title": "Natural-language query with visible parse",
+      "why": "Shows what it understood",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "A03",
+      "title": "Sector, ratio, score and valuation presets",
+      "why": "10 vetted screens",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "A04",
+      "title": "Piotroski / Altman / Beneish + composite",
+      "why": "Classic distress and quality scores",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "A05",
+      "title": "DuPont, CCC, CAGR, red flags",
+      "why": "Deep metrics",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "A06",
+      "title": "ROIC, EVA, reinvestment, growth quality",
+      "why": "Capital efficiency",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "A07",
+      "title": "Trend series (margin, debt, accruals, WC days)",
+      "why": "Quality over time",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "A08",
+      "title": "Quarterly YoY / QoQ",
+      "why": "Short-term momentum in results",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "A09",
+      "title": "Anomaly detection (\u226550% YoY moves)",
+      "why": "Flags the unusual",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "A10",
+      "title": "Data-quality score with missing inputs named",
+      "why": "Honesty about gaps",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "A11",
+      "title": "Five valuation models + scenarios + blend",
+      "why": "Valuation lab",
+      "status": "done",
+      "effort": "L"
+    },
+    {
+      "id": "A12",
+      "title": "Bear/base/bull band, P/E band, Markdown report",
+      "why": "Output a human can read",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "A13",
+      "title": "Balance-sheet strength verdict",
+      "why": "Leverage and cover",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "A14",
+      "title": "Company intelligence (segments, order book, guidance)",
+      "why": "Business context",
+      "status": "done",
+      "effort": "L"
+    },
+    {
+      "id": "A15",
+      "title": "Dividends: history, TTM, growth, streak, yield on cost",
+      "why": "Income view",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "A16",
+      "title": "Analyst consensus, targets, forward estimates",
+      "why": "Sell-side view",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "A17",
+      "title": "Ownership and insider transactions",
+      "why": "Who owns it",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "A18",
+      "title": "Earnings estimates, surprises, calendar, reaction",
+      "why": "Event view",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "A19",
+      "title": "Correlation matrix, Sharpe-like ratio, drawdown recovery",
+      "why": "Portfolio risk",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "A20",
+      "title": "Sector rotation, breadth, freshness, coverage",
+      "why": "Market structure",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "A21",
+      "title": "Atlas Score (7 weighted inputs, all exposed)",
+      "why": "One number with reasons",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "A22",
+      "title": "Explainer ('why these numbers')",
+      "why": "Plain-English metric meaning",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "A23",
+      "title": "Total return (price + dividends)",
+      "why": "Honest performance",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "A24",
+      "title": "Investability score A\u2013D",
+      "why": "Composite ranking",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "A25",
+      "title": "Backtesting engine",
+      "why": "Would need bias-free history",
+      "status": "planned",
+      "effort": "L"
+    },
+    {
+      "id": "I01",
+      "title": "Local LLM client, loopback-only guard",
+      "why": "Nothing leaves the device",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "I02",
+      "title": "Grounded answers from computed facts",
+      "why": "21-fact context block",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "I03",
+      "title": "Numeric cross-check (flags invented figures)",
+      "why": "Anti-hallucination",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "I04",
+      "title": "Deterministic fallback when no model",
+      "why": "Always answers",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "I05",
+      "title": "AI Store: catalogue, install, verify, uninstall",
+      "why": "11 packs, 6 kinds",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "I06",
+      "title": "Quantized model packs (Qwen 1.5B/3B, Llama 1B)",
+      "why": "Sized for phones",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "I07",
+      "title": "Model download with resume + checksum",
+      "why": "Large files on flaky networks",
+      "status": "planned",
+      "effort": "M"
+    },
+    {
+      "id": "I08",
+      "title": "Prompt library for market questions",
+      "why": "Reusable analyses",
+      "status": "planned",
+      "effort": "S"
+    },
+    {
+      "id": "I09",
+      "title": "Multi-turn conversation memory",
+      "why": "Follow-up questions",
+      "status": "planned",
+      "effort": "M"
+    },
+    {
+      "id": "I10",
+      "title": "On-device embeddings for peer similarity",
+      "why": "Find comparable companies",
+      "status": "planned",
+      "effort": "M"
+    },
+    {
+      "id": "I11",
+      "title": "Local document Q&A (annual report PDFs)",
+      "why": "Read filings offline",
+      "status": "planned",
+      "effort": "L"
+    },
+    {
+      "id": "I12",
+      "title": "Model A/B comparison harness",
+      "why": "Pick the best small model",
+      "status": "planned",
+      "effort": "M"
+    },
+    {
+      "id": "I13",
+      "title": "Speech input for questions",
+      "why": "Hands-free on mobile",
+      "status": "planned",
+      "effort": "M"
+    },
+    {
+      "id": "I14",
+      "title": "Answer citations linking to the metric row",
+      "why": "Verify at a glance",
+      "status": "planned",
+      "effort": "S"
+    },
+    {
+      "id": "I15",
+      "title": "A model actually running in CI",
+      "why": "Needs weights",
+      "status": "blocked",
+      "effort": "L"
+    },
+    {
+      "id": "U01",
+      "title": "Dense tabular console with 11 views",
+      "why": "Screener-first design",
+      "status": "done",
+      "effort": "L"
+    },
+    {
+      "id": "U02",
+      "title": "Market switcher with 9 countries",
+      "why": "No default market",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "U03",
+      "title": "Touch targets \u226544px on mobile",
+      "why": "Fitts's law",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "U04",
+      "title": "Every input has an accessible name",
+      "why": "Screen-reader ready",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "U05",
+      "title": "WCAG AA contrast (7.61:1 secondary text)",
+      "why": "Readable",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "U06",
+      "title": "Lock screen with PIN",
+      "why": "Local auth UI",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "U07",
+      "title": "Dark/light theme",
+      "why": "Preference",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "U08",
+      "title": "Import screen: sources + feature matrix",
+      "why": "No dead ends visible",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "U09",
+      "title": "Intelligence view (breadth, rotation, coverage, jobs)",
+      "why": "Ops + market context",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "U10",
+      "title": "Compare view (2\u20135 companies)",
+      "why": "Side by side",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "U11",
+      "title": "AI Store view",
+      "why": "Install and unlock",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "U12",
+      "title": "Keyboard shortcuts (/, g+d, ?)",
+      "why": "Power users",
+      "status": "planned",
+      "effort": "S"
+    },
+    {
+      "id": "U13",
+      "title": "Shareable screen URLs (?expr=)",
+      "why": "Send a screen",
+      "status": "planned",
+      "effort": "S"
+    },
+    {
+      "id": "U14",
+      "title": "Hindi + regional UI strings",
+      "why": "Markets are multilingual",
+      "status": "planned",
+      "effort": "M"
+    },
+    {
+      "id": "U15",
+      "title": "Print/PDF tearsheet",
+      "why": "Hand a report to someone",
+      "status": "planned",
+      "effort": "M"
+    },
+    {
+      "id": "P01",
+      "title": "PIN auth, PBKDF2-SHA256, lockout, sessions",
+      "why": "No open API",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "P02",
+      "title": "Rate limiting (240/min, token bucket)",
+      "why": "Abuse resistance",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "P03",
+      "title": "Security headers (CSP, XFO, nosniff)",
+      "why": "Hardened",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "P04",
+      "title": "Clean error envelope, no stack leaks",
+      "why": "Safe errors",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "P05",
+      "title": "Health endpoint, version single-sourced",
+      "why": "Truthful status",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "P06",
+      "title": "Persistent job queue with crash recovery",
+      "why": "Background work",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "P07",
+      "title": "Graceful shutdown (SIGINT/SIGTERM)",
+      "why": "No corrupt writes",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "P08",
+      "title": "CI workflow, linted 0/0",
+      "why": "Automated checks",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "P09",
+      "title": "Ten verification suites, one command",
+      "why": "Provable quality",
+      "status": "done",
+      "effort": "L"
+    },
+    {
+      "id": "P10",
+      "title": "Git repository with history",
+      "why": "Durable",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "P11",
+      "title": "TLS termination",
+      "why": "Reverse proxy",
+      "status": "planned",
+      "effort": "S"
+    },
+    {
+      "id": "P12",
+      "title": "Multi-user accounts and roles",
+      "why": "Single-user today",
+      "status": "planned",
+      "effort": "L"
+    },
+    {
+      "id": "P13",
+      "title": "Postgres + Redis session store",
+      "why": "Horizontal scale",
+      "status": "planned",
+      "effort": "L"
+    },
+    {
+      "id": "P14",
+      "title": "Audit log of user actions",
+      "why": "Compliance",
+      "status": "planned",
+      "effort": "M"
+    },
+    {
+      "id": "P15",
+      "title": "Container image + compose file",
+      "why": "Deployable",
+      "status": "planned",
+      "effort": "M"
+    },
+    {
+      "id": "X01",
+      "title": "PWA manifest, real icons, service worker",
+      "why": "Installs as an app",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "X02",
+      "title": "Flat archives, no wrapper folder",
+      "why": "Converters accept them",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "X03",
+      "title": "Archive validator (structure, icons, refs)",
+      "why": "Catches defects pre-upload",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "X04",
+      "title": "Android signing kit + TWA config + assetlinks route",
+      "why": "Gate 1/2 guidance",
+      "status": "done",
+      "effort": "M"
+    },
+    {
+      "id": "X05",
+      "title": "APK compile and sign",
+      "why": "No JDK/SDK here",
+      "status": "blocked",
+      "effort": "M"
+    },
+    {
+      "id": "X06",
+      "title": "Windows .exe via Electron",
+      "why": "No Windows toolchain",
+      "status": "blocked",
+      "effort": "L"
+    },
+    {
+      "id": "X07",
+      "title": "iOS wrapper (WKWebView)",
+      "why": "Needs macOS",
+      "status": "planned",
+      "effort": "M"
+    },
+    {
+      "id": "X08",
+      "title": "Auto-update channel",
+      "why": "Ship fixes",
+      "status": "planned",
+      "effort": "M"
+    },
+    {
+      "id": "X09",
+      "title": "Play Store listing assets",
+      "why": "Screenshots, description",
+      "status": "planned",
+      "effort": "S"
+    },
+    {
+      "id": "X10",
+      "title": "Desktop menu-bar app",
+      "why": "Quick access",
+      "status": "planned",
+      "effort": "M"
+    },
+    {
+      "id": "C01",
+      "title": "Synthetic data labelled everywhere (fixture)",
+      "why": "Never passes fiction as fact",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "C02",
+      "title": "Not-investment-advice disclaimer in reports",
+      "why": "Legal hygiene",
+      "status": "planned",
+      "effort": "S"
+    },
+    {
+      "id": "C03",
+      "title": "Data provenance per row (source column)",
+      "why": "Traceable",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "C04",
+      "title": "Privacy note: device-only, no telemetry",
+      "why": "Trust",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "C05",
+      "title": "No bot-protection circumvention (documented)",
+      "why": "Ethical boundary",
+      "status": "done",
+      "effort": "S"
+    },
+    {
+      "id": "C06",
+      "title": "Licence audit of every dependency",
+      "why": "Legal",
+      "status": "planned",
+      "effort": "S"
+    },
+    {
+      "id": "C07",
+      "title": "GDPR-style export/delete of personal data",
+      "why": "User control",
+      "status": "planned",
+      "effort": "M"
+    },
+    {
+      "id": "C08",
+      "title": "Financial-content review policy",
+      "why": "Avoid advice liability",
+      "status": "planned",
+      "effort": "M"
+    },
+    {
+      "id": "C09",
+      "title": "Source attribution page",
+      "why": "Credit data providers",
+      "status": "planned",
+      "effort": "S"
+    },
+    {
+      "id": "C10",
+      "title": "Incident disclosure template",
+      "why": "If a source breaks",
+      "status": "planned",
+      "effort": "S"
+    }
+  ]
+}

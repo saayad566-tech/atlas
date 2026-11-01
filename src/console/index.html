@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#1a56db" />
+<meta name="description" content="Atlas — local-first platform for deep fundamental analysis: screening, custom ratios, reverse DCF, multi-year trends and peer ranking across nine markets." />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Atlas" />
+<meta name="format-detection" content="telephone=no" />
+<title>Atlas — stock research and screening</title>
+<link rel="manifest" href="./manifest.json" />
+<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
+<link rel="apple-touch-icon" href="./icons/icon-192.png" />
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+<div id="offline-banner" class="offline" hidden role="status">You are offline — showing stored data. Live fetches are paused.</div>
+<div class="setup" id="setup" hidden>
+  <div class="setupcard">
+    <div class="locklogo">A</div>
+    <h1>Choose your market</h1>
+    <p class="hint">Atlas ships with no data. Pick a country — only that market's data is loaded, and nothing crosses between them.</p>
+    <div class="setupgrid" id="setup-grid"></div>
+    <div class="hint" id="setup-msg" role="status"></div>
+  </div>
+</div>
+<div class="lockscreen" id="lockscreen" hidden>
+  <div class="lockcard">
+    <div class="locklogo">A</div>
+    <h2>Atlas is locked</h2>
+    <p class="hint">Enter your PIN to continue.</p>
+    <input id="lock-pin" class="input" type="password" inputmode="numeric" placeholder="PIN" autocomplete="current-password" aria-label="Unlock PIN" />
+    <button class="btn primary" id="lock-unlock">Unlock</button>
+    <div class="hint" id="lock-msg" role="status"></div>
+  </div>
+</div>
+<header class="topbar">
+  <div class="brand"><span class="logo">S</span><span>Sift</span><small>local screener</small></div>
+  <div class="searchwrap">
+    <input id="search" class="search" type="search" placeholder="Search a company or symbol…  ( / )" autocomplete="off" aria-label="Search companies" />
+    <div id="hits" class="hits" hidden></div>
+  </div>
+  <nav class="nav">
+    <button class="navbtn active" data-view="screener">Screener</button>
+    <button class="navbtn" data-view="watchlist">Watchlist</button>
+    <button class="navbtn" data-view="rank">Rank</button>
+    <button class="navbtn" data-view="portfolio">Portfolio</button>
+    <button class="navbtn" data-view="macro">Macro</button>
+    <button class="navbtn" data-view="intel">Intelligence</button>
+    <input id="global-search" class="input sm" placeholder="Search any stock…" aria-label="Search stocks" style="max-width:220px" />
+    <button class="btn sm ghost" id="btn-format" title="Toggle crore / million" aria-label="Toggle number format">₹Cr</button>
+    <button class="btn sm ghost" id="btn-help" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">?</button>
+    <select id="market-select" class="input sm" aria-label="Market" title="Download and switch country bundles"></select>
+    <button class="navbtn" data-view="compare">Compare</button>
+    <button class="navbtn" data-view="store">AI Store</button>
+    <button class="navbtn" data-view="import">Import</button>
+  </nav>
+  <div class="spacer"></div>
+  <button class="btn sm ghost" id="btn-theme" title="Toggle theme" aria-label="Toggle theme">◐</button>
+  <span class="chip" id="dataset-chip" title="Where the data comes from">…</span>
+</header>
+
+<main class="main">
+  <!-- Screener -->
+  <section id="view-screener" class="view active">
+    <div class="querybar">
+      <div class="nlrow">
+        <input id="nl" class="nl" type="text" placeholder="Describe what you want — e.g. “zero debt, ROE above 20, P/E under 20”" aria-label="Natural language query" />
+        <button id="btn-run-nl" class="btn primary">Screen</button>
+      </div>
+      <div class="exprrow">
+        <button class="btn sm ghost" id="btn-watch-all">★ Add all to watchlist</button>
+        <button class="btn sm ghost" id="btn-watch-csv">Export watchlist CSV</button>
+        <button class="btn sm ghost" id="btn-copy-tsv">Copy as TSV</button>
+        <button class="btn sm ghost" id="btn-export-xlsx">Export Excel</button>
+        <button class="btn sm ghost" id="btn-ratio">Custom ratio</button>
+        <button class="btn sm ghost" id="btn-wall" title="Open this view on several displays">Wall…</button>
+        <span class="hint" id="result-count"></span>
+      </div>
+      <div class="exprrow" id="quick-filters"></div>
+      <div class="cards" id="screen-analysis"></div>
+    <div class="briefing" id="ratio-panel" hidden>
+      <div class="bhead">Custom ratios</div>
+      <div id="ratio-list"></div>
+      <div class="exprrow" style="margin-top:8px">
+        <input class="input" id="ratio-name" aria-label="Custom ratio name" placeholder="Name (e.g. Cash Conversion)" style="max-width:200px" />
+        <input class="input" id="ratio-formula" aria-label="Custom ratio formula" placeholder="Formula (e.g. cfo / net_profit * 100)" style="flex:1" />
+        <button class="btn sm primary" id="ratio-save">Save</button>
+      </div>
+      <div class="hint" id="ratio-msg"></div>
+    </div>
+      <div class="exprrow" id="recents"></div>
+      <div class="exprrow" id="screen-history"></div>
+      <div class="exprrow"><button id="btn-builder" class="btn sm ghost" aria-expanded="false" aria-controls="builder">Builder</button></div>
+      <div id="builder" class="builder" hidden>
+        <div id="builder-rows"></div>
+        <div class="builder-actions">
+          <button class="btn sm ghost" id="btn-builder-add">+ Condition</button>
+          <select id="builder-op" class="input sm" aria-label="Combine with"><option value="AND">ALL (AND)</option><option value="OR">ANY (OR)</option></select>
+          <button class="btn sm primary" id="btn-builder-apply">Apply</button>
+        </div>
+        <div class="hint" id="builder-msg"></div>
+      </div>
+      <div class="exprrow"><datalist id="field-list"></datalist><select id="sector-filter" class="input sm" aria-label="Sector"><option value="">All sectors</option></select>
+        <input id="expr" class="expr mono" type="text" aria-label="Screen expression" placeholder='Expression — e.g. Market Cap > 500 AND ROE > 15' aria-label="Screener expression" />
+        <button id="btn-apply" class="btn">Apply</button>
+        <button id="btn-csv" class="btn ghost" title="Download results as CSV">CSV</button>
+      <button id="btn-csv-rich" class="btn sm ghost" title="Export with every computed column">Export enriched</button>
+      <select id="saved-screens" class="input sm" aria-label="Saved screens"><option value="">Saved screens…</option></select>
+      <button id="btn-save-screen" class="btn sm ghost">Save screen</button>
+        <button id="btn-columns" class="btn ghost" title="Choose and arrange columns">Columns</button>
+      </div>
+      <div id="notes" class="notes" aria-live="polite"></div>
+      <div class="chips" id="examples"></div>
+      <div class="chips presets" id="presets"></div>
+    </div>
+
+    <div class="statusline"><span id="status">Ready.</span><span class="spacer"></span><span id="echo" class="mono echo"></span></div>
+    <div class="briefing" id="market-briefing" hidden>
+      <div class="bhead"><span id="mb-greeting">Good morning</span> · <span class="hint" id="mb-when"></span></div>
+      <div class="bheadline" id="mb-headline"></div>
+      <div id="mb-body"></div>
+      <div class="bfoot hint" id="mb-confidence"></div>
+    </div>
+    <div class="statsline" id="stats-line"></div>
+    <div class="tablewrap">
+      <table class="dense" id="results">
+        <thead><tr id="result-head"></tr></thead>
+        <tbody id="result-body"></tbody>
+      </table>
+      <div id="empty" class="emptystate" hidden>
+        <div class="t" id="empty-title">No companies match</div>
+        <div class="d" id="empty-body">Try widening the filters.</div>
+        <div class="exprrow" id="empty-actions" style="justify-content:center" hidden>
+          <button class="btn sm primary" id="btn-empty-demo">Load demo pack</button>
+          <button class="btn sm" id="btn-empty-dir">Sync the directory</button>
+          <button class="btn sm ghost" id="btn-empty-fetch">Fetch a symbol</button>
+        </div>
+        <div class="d hint" id="empty-msg"></div>
+      </div>
+
+    </div>
+    <div class="pager"><button id="btn-more" class="btn sm" hidden>Load more</button></div>
+  </section>
+
+  <!-- Company -->
+  <section id="view-company" class="view">
+    <button id="btn-back" class="btn sm ghost">← Back to screener</button>
+    <div id="co-head" class="cohead"></div>
+    <div class="metricgrid" id="co-metrics"></div>
+    <div class="section-h">Price &amp; market <span class="hint">from stored daily history</span></div>
+    <div class="metricgrid" id="co-price"></div>
+    <div class="health" id="co-health"></div>
+    <div class="section-h">Scores <span class="hint">Piotroski · Altman · Beneish · composite</span></div>
+    <div class="cards" id="co-scores"></div>
+    <div class="section-h">Deep analysis <span class="hint">DuPont · cash cycle · accruals · growth quality</span></div>
+    <div class="metricgrid" id="co-deep"></div>
+    <div class="section-h">Factor scores <span class="hint">percentile vs the whole universe</span></div>
+    <div class="cards" id="co-factors"></div>
+    <div class="section-h">Valuation <span class="hint">Graham · DCF-lite · sensitivity</span></div>
+    <div class="metricgrid" id="co-valuation"></div>
+    <div class="section-h">Balance-sheet strength <span class="hint">net debt · cash conversion · cover</span></div>
+    <div class="cards" id="co-strength"></div>
+    <div class="exprrow">
+      <button class="btn sm ghost" id="btn-copy-sym">Copy symbol</button>
+      <button class="btn sm ghost" id="btn-print">Print</button>
+    </div>
+    <div class="section-h">Full research report <span class="hint">20-section institutional outline</span>
+      <span class="spacer"></span><button class="btn sm" id="btn-research">Generate report</button></div>
+    <div class="cards" id="co-research"></div>
+    <div class="section-h">Atlas Score <span class="hint">one number, every reason behind it</span></div>
+    <div class="cards" id="co-atlas"></div>
+    <div class="section-h">Ask about this company <span class="hint">on-device model · answers grounded in computed facts</span></div>
+    <div class="cards" id="co-ask"></div>
+    <div class="section-h">More intelligence <span class="hint">explainer · investability · risk · total return · peers</span></div>
+    <div id="co-more" class="cards"></div>
+    <div class="section-h">News <span class="hint">headlines from reachable RSS feeds</span>
+      <span class="spacer"></span><button class="btn sm ghost" id="btn-news">Fetch headlines</button></div>
+    <div id="co-news" class="intel"></div>
+    <div class="briefing" id="co-briefing" hidden>
+      <div class="bheadline" id="cb-headline"></div>
+      <div id="cb-body"></div>
+      <div id="cb-dissent"></div>
+      <div id="cb-falsify"></div>
+      <div class="bfoot hint" id="cb-confidence"></div>
+    </div>
+    <div class="section-h">Multi-year trend <span class="hint">recomputed from each annual statement</span></div>
+    <div class="cards" id="co-history"></div>
+    <div class="section-h">Derived metrics <span class="hint">computed from the fundamentals above</span></div>
+    <div class="cards" id="co-extras"></div>
+    <div class="section-h">Price history <span class="hint">daily closes · 50 &amp; 200-day averages</span></div>
+    <div class="cards" id="co-chart"></div>
+    <div class="section-h">Timeline <span class="hint">dividends · splits · insider · earnings</span></div>
+    <div class="cards" id="co-timeline"></div>
+    <div class="section-h">Data freshness <span class="hint">how old each source is</span></div>
+    <div class="cards" id="co-fresh"></div>
+    <div class="section-h">Market &amp; analysts <span class="hint">dividends · consensus · ownership · risk</span></div>
+    <div class="cards" id="co-market"></div>
+    <div class="section-h">Capital efficiency &amp; quality <span class="hint">ROIC · EVA · trends · anomalies</span>
+      <span class="spacer"></span><button class="btn sm ghost" id="btn-audit">Run feature audit</button></div>
+    <div class="cards" id="co-deep2"></div>
+    <div id="co-audit" class="intel" hidden></div>
+    <div class="section-h">Valuation lab <span class="hint">editable assumptions · multi-model</span>
+      <span class="spacer"></span>
+      <select class="input sm" id="val-scenario" aria-label="Scenario"><option value="base">Base</option><option value="conservative">Conservative</option><option value="optimistic">Optimistic</option></select>
+      <button class="btn sm" id="btn-val-save">Save</button>
+      <button class="btn sm ghost" id="btn-val-reset">Reset</button>
+      <button class="btn sm ghost" id="btn-val-md">Report .md</button></div>
+    <div id="co-val2" class="cards"></div>
+    <div class="section-h">Your note <span class="hint">stored locally</span></div>
+    <div class="notesbox"><textarea id="co-note" rows="2" placeholder="Why is this on your list?"></textarea><button class="btn sm" id="btn-save-note">Save</button><button class="btn sm" id="btn-watch">Watch</button>
+      <button class="btn sm" id="btn-fetch-history" hidden title="Pull fundamentals history from the live source">Fetch history</button>
+      <span class="stars" id="co-stars" role="group" aria-label="Your rating"></span></div>
+    <div class="tabs" id="co-tabs" role="tablist"></div>
+    <div class="tablewrap" id="co-table-wrap">
+      <table class="dense" id="co-table"><thead><tr id="co-table-head"></tr></thead><tbody id="co-table-body"></tbody></table>
+    </div>
+    <div id="co-intel" class="intel" hidden></div>
+  </section>
+  <section id="view-watchlist" class="view">
+    <div class="cards" id="wl-calendar"></div>
+    <div class="section-h">Watchlist <span class="hint">your tracked companies</span></div>
+    <div class="tablewrap"><table class="dense"><thead><tr>
+      <th class="l">Company</th><th>M.Cap ₹Cr</th><th>P/E</th><th>ROE</th><th>D/E</th><th>Added</th><th></th>
+    </tr></thead><tbody id="watch-body"></tbody></table></div>
+    <div class="section-h">Alerts <span class="hint">built-in checks on your watchlist</span></div>
+    <div id="alerts" class="alerts"></div>
+    <div class="section-h">Your alert rules <span class="hint">metric · operator · threshold</span></div>
+    <div class="importbox"><div class="row">
+      <select class="input" id="rule-metric" style="max-width:180px">
+        <option value="pe">P/E</option><option value="roe">ROE</option><option value="roce">ROCE</option><option value="opm">OPM</option>
+        <option value="debt_to_equity">Debt/Equity</option><option value="pledge">Pledged</option><option value="promoter_holding">Promoter holding</option>
+        <option value="sales_growth_3y">Sales growth 3Y</option><option value="market_cap">Market cap</option><option value="current_ratio">Current ratio</option>
+      </select>
+      <select class="input" id="rule-op" style="max-width:90px"><option>&gt;</option><option>&lt;</option><option>&gt;=</option><option>&lt;=</option></select>
+      <input class="input" id="rule-threshold" type="number" placeholder="Threshold" style="max-width:130px" aria-label="Alert threshold" />
+      <button class="btn primary" id="btn-rule-add">Add rule</button>
+    </div></div>
+    <div id="rules-list" class="alerts"></div>
+  </section>
+
+  <section id="view-rank" class="view">
+    <div class="statsline" id="breadth"></div>
+    <div class="section-h">Factor ranking <span class="hint">composite score across the universe</span></div>
+    <div class="tablewrap"><table class="dense"><thead><tr>
+      <th class="l">Company</th><th>Composite</th><th>Value</th><th>Quality</th><th>Growth</th><th>M.Cap ₹Cr</th>
+    </tr></thead><tbody id="rank-body"></tbody></table></div>
+    <div class="section-h">Sector benchmarks <span class="hint">median metrics by sector</span></div>
+    <div class="tablewrap"><table class="dense"><thead><tr>
+      <th class="l">Sector</th><th>Cos</th><th>P/E</th><th>ROE</th><th>OPM</th><th>D/E</th><th>Sales 3Y</th><th>M.Cap</th>
+    </tr></thead><tbody id="sector-body"></tbody></table></div>
+  </section>
+
+  <section id="view-portfolio" class="view">
+    <div class="cards" id="portfolio-pnl"></div>
+    <div class="cards" id="pf-analysis"></div>
+    <div class="section-h">Decision journal <span class="hint">why you bought, graded against what happened</span></div>
+    <div class="briefing" id="journal-score" hidden></div>
+    <div class="tablewrap"><table class="dense"><thead><tr><th class="l">Company</th><th class="l">Your thesis</th><th>Call</th><th>Entry</th><th>Now</th><th>Verdict</th></tr></thead><tbody id="journal-rows"></tbody></table></div>
+    <div class="exprrow" id="pf-form">
+      <input class="input sm" id="pf-symbol" placeholder="Symbol" aria-label="Symbol" style="max-width:160px" />
+      <input class="input sm" id="pf-qty" type="number" placeholder="Qty" aria-label="Quantity" style="max-width:100px" />
+      <input class="input sm" id="pf-cost" type="number" placeholder="Avg cost" aria-label="Average cost" style="max-width:120px" />
+      <button class="btn sm primary" id="btn-pf-add">Add holding</button>
+      <span class="hint" id="pf-msg"></span>
+    </div>
+    <div class="section-h">Portfolio <span class="hint">holdings you entered, valued at the latest price</span></div>
+    <div class="statsline" id="pf-summary"></div>
+    <div class="tablewrap"><table class="dense"><thead><tr>
+      <th class="l">Company</th><th>Qty</th><th>Avg cost</th><th>Price</th><th>Value ₹</th><th>P&amp;L ₹</th><th>P&amp;L %</th><th>Weight %</th><th></th>
+    </tr></thead><tbody id="pf-body"></tbody></table></div>
+    <div class="section-h">Add a holding</div>
+    <div class="importbox"><div class="row">
+      <input class="input" id="pf-sym" placeholder="Symbol" style="max-width:140px" aria-label="Portfolio symbol" />
+      <input class="input" id="pf-qty" type="number" placeholder="Quantity" style="max-width:130px" aria-label="Portfolio quantity" />
+      <input class="input" id="pf-cost" type="number" placeholder="Avg cost ₹" style="max-width:150px" aria-label="Portfolio average cost" />
+      <button class="btn primary" id="btn-pf-add">Add</button>
+      <span class="hint" id="pf-status"></span>
+    </div></div>
+  </section>
+
+  <section id="view-store" class="view">
+    <div class="section-h">Local model <span class="hint">device-aware recommendation, install, switch</span></div>
+    <div class="cards" id="model-panel"></div>
+    <div class="section-h">Model catalogue <span class="hint">quantized variants with fit verdicts</span></div>
+    <div class="tablewrap"><table class="dense"><thead><tr><th class="l">Model</th><th>Params</th><th>Quant</th><th>Size</th><th>RAM</th><th>Fit</th><th class="l">Action</th></tr></thead><tbody id="model-rows"></tbody></table></div>
+    <div class="exprrow">
+      <input id="model-path" class="input sm" placeholder="Path to a .gguf file to install" aria-label="Model file path" style="flex:1" />
+      <button class="btn sm" id="btn-model-install">Install from file</button>
+    </div>
+    <div class="section-h">AI Store <span class="hint">models · data bundles · strategies · templates</span>
+      <span class="spacer"></span><button class="btn sm" id="btn-store-refresh">Refresh</button></div>
+    <div class="cards" id="store-summary"></div>
+    <div class="tablewrap"><table class="dense"><thead><tr>
+      <th class="l">Pack</th><th>Kind</th><th>Size</th><th>Licence</th><th>Status</th><th class="l">Unlocks</th><th></th>
+    </tr></thead><tbody id="store-body"></tbody></table></div>
+  </section>
+
+  <section id="view-compare" class="view">
+    <div class="section-h">Compare companies <span class="hint">2 to 5 side by side</span>
+      <span class="spacer"></span><button class="btn sm" id="btn-compare">Compare</button></div>
+    <div class="querybar"><input id="compare-symbols" class="input" placeholder="Symbols, comma separated — e.g. RELIANCE.NS, TCS.NS, INFY.NS" aria-label="Symbols to compare" /></div>
+    <div class="tablewrap"><table class="dense"><thead id="compare-head"></thead><tbody id="compare-body"></tbody></table></div>
+  </section>
+
+  <section id="view-intel" class="view">
+    <div class="section-h">Activity log <span class="hint">what the app noticed on its own</span></div>
+    <div class="cards" id="events-panel"></div>
+    <div class="tablewrap"><table class="dense"><thead><tr><th class="l">When</th><th class="l">Event</th><th class="l">Detail</th></tr></thead><tbody id="events-rows"></tbody></table></div>
+    <div class="exprrow">
+      <input id="webhook-url" class="input sm" placeholder="https://hooks.slack.com/… (optional)" aria-label="Webhook URL" style="flex:1" />
+      <button class="btn sm" id="btn-webhook-save">Save webhook</button>
+      <span class="hint" id="webhook-msg"></span>
+    </div>
+    <div class="section-h">Upcoming listings <span class="hint">filed and priced, not yet trading</span></div>
+    <div class="cards" id="prelisting-panel"></div>
+    <div class="tablewrap"><table class="dense"><thead><tr><th class="l">Company</th><th>Form</th><th>Filed</th><th>Status</th><th>Ticker</th><th>Price range</th></tr></thead><tbody id="prelisting-rows"></tbody></table></div>
+    <div class="section-h">All stocks <span class="hint">every listed symbol in this market</span></div>
+    <div class="cards" id="directory-panel"></div>
+    <div class="exprrow">
+      <input id="dir-q" class="input sm" placeholder="Search the full directory…" aria-label="Search directory" style="flex:1" />
+      <button class="btn sm" id="btn-dir-sync">Sync directory</button>
+      <button class="btn sm primary" id="btn-enrich">Enrich stocks</button>
+      <button class="btn sm ghost" id="btn-bulk-sync">Bulk sync</button>
+      <span class="hint" id="dir-msg"></span>
+    </div>
+    <div class="tablewrap"><table class="dense"><thead><tr><th class="l">Symbol</th><th class="l">Name</th><th>Sector</th><th>Data</th></tr></thead><tbody id="dir-rows"></tbody></table></div>
+    <div class="section-h">All sectors <span class="hint">counts and averages for this market</span></div>
+    <div class="cards" id="intel-sectors"></div>
+    <div class="section-h">Sector phases <span class="hint">where the money is turning, not just where it went</span></div>
+    <div class="cards" id="discover-sectors"></div>
+    <div class="section-h">Worth a closer look <span class="hint">ranked by agreement across dimensions · research, not advice</span></div>
+    <div class="cards" id="discover-picks"></div>
+    <div class="section-h">Top movers <span class="hint">30-day change</span></div>
+    <div class="cards" id="intel-movers"></div>
+    <div class="section-h">Sector breadth <span class="hint">advancing vs declining</span></div>
+    <div class="cards" id="intel-breadth"></div>
+    <div class="section-h">Sector breadth chart</div>
+    <div class="cards" id="intel-sector-chart"></div>
+    <div class="section-h">Full country universe <span class="hint">every stock in this market's index</span>
+      <span class="spacer"></span><button class="btn sm" id="btn-universe">Load universe</button></div>
+    <div class="cards" id="intel-universe"></div>
+    <div class="section-h">Universe intelligence <span class="hint">breadth · rotation · coverage · freshness</span>
+      <span class="spacer"></span><button class="btn sm" id="btn-intel-refresh">Refresh</button></div>
+    <div class="cards" id="intel-cards"></div>
+    <div class="section-h">Sector rotation</div>
+    <div class="tablewrap"><table class="dense"><thead><tr><th class="l">Sector</th><th>Companies</th><th>1M</th><th>3M</th><th>1Y</th></tr></thead><tbody id="intel-rotation"></tbody></table></div>
+    <div class="section-h">Correlation <span class="hint">daily returns, top 6 companies</span>
+      <span class="spacer"></span><button class="btn sm ghost" id="btn-corr">Compute</button></div>
+    <div class="tablewrap"><table class="dense" id="intel-corr"></table></div>
+    <div class="section-h">Background jobs <span class="hint">refresh queue</span>
+      <span class="spacer"></span><button class="btn sm ghost" id="btn-jobs-refresh">Queue refresh</button><button class="btn sm ghost" id="btn-jobs-drain">Run queue</button></div>
+    <div class="cards" id="intel-jobs"></div>
+    <div class="section-h">Data safety <span class="hint">backup and restore the whole database</span></div>
+    <div class="section-h">Auto-update <span class="hint">keeps live prices current</span></div>
+    <div class="cards" id="refresh-panel"></div>
+    <div class="cards" id="intel-tools"></div>
+    <div class="cards" id="intel-admin"></div>
+    <div class="section-h">Data freshness <span class="hint">stale companies need a refresh</span></div>
+    <div class="tablewrap"><table class="dense"><thead><tr><th class="l">Symbol</th><th>Price age</th><th>Statement age</th><th>Status</th></tr></thead><tbody id="intel-fresh"></tbody></table></div>
+  </section>
+
+  <section id="view-import" class="view">
+    <div class="section-h">Data sources <span class="hint">every source researched, with live status</span>
+      <span class="spacer"></span><button class="btn sm" id="btn-recheck">Re-check</button></div>
+    <div class="tablewrap"><table class="dense"><thead><tr>
+      <th class="l">Source</th><th>Kind</th><th>Status</th><th class="l">Provides</th><th class="l">Note</th>
+    </tr></thead><tbody id="src-body"></tbody></table></div>
+    <div class="section-h">Feature → data path <span class="hint">every screen, and every way to fill it</span></div>
+    <div class="tablewrap"><table class="dense"><thead><tr>
+      <th class="l">Feature</th><th class="l">Screen</th><th class="l">Paths</th>
+    </tr></thead><tbody id="matrix-body"></tbody></table></div>
+  </section>
+
+
+  <section id="view-macro" class="view">
+    <div class="section-h">Macro <span class="hint">World Bank, free &amp; open</span>
+      <button class="btn sm" id="btn-macro-refresh">Refresh</button></div>
+    <div class="cards" id="macro-cards"></div>
+    <div class="section-h">Import your own data <span class="hint">CSV of annual statements</span></div>
+    <div class="importbox">
+      <textarea id="csv-text" rows="5" placeholder="symbol,name,sector,period_end,sales,net_profit,equity_capital,reserves,borrowings,total_assets,total_liabilities,cfo,receivables,inventory,payables,cash,price"></textarea>
+      <div class="row"><button class="btn primary" id="btn-import">Import CSV</button><span id="import-status" class="hint"></span></div>
+    </div>
+  </section>
+</main>
+
+<script src="./app.js"></script>
+<script>
+  // Register the service worker so the shell starts offline.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('./service-worker.js').catch(function () { /* http or unsupported */ });
+    });
+  }
+</script>
+<div class="statusline" id="health-line" aria-live="polite"></div>
+</body>
+</html>

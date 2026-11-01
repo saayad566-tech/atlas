@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-verify:
+    name: Build and verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: npx tsc -p tsconfig.json --noEmit
+
+      - name: Build
+        run: |
+          npx tsc -p tsconfig.json
+          node scripts/copy-assets.mjs
+
+      - name: Verify universe analytics
+        run: node scripts/verify-universe.js
+
+      - name: Verify production security
+        run: node scripts/verify-prod.js
+
+      - name: Verify PWA compliance
+        run: node scripts/verify-pwa.js
+
+      - name: Verify archive structure
+        run: |
+          bash scripts/pack.sh "$RUNNER_TEMP/out"
+          node scripts/verify-zip.js
+
+      - name: Upload archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-archives
+          path: |
+            ${{ runner.temp }}/out/atlas-platform.zip
+            ${{ runner.temp }}/out/atlas-pwa.zip
+          retention-days: 14
