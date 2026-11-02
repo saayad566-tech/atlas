@@ -1,99 +1,104 @@
-# Atlas — a local-first platform for deep fundamental analysis
+# Atlas
 
-One application for screening and analysing listed companies across nine markets, on real
-market data. It runs as a single Node process on your own machine, serves a browser console,
-keeps everything in local SQLite files, and fetches from public sources.
+**A local-first, multi-asset investment analysis platform.**
 
-No account. No cloud backend. No telemetry. One runtime dependency.
+Stocks, ETFs, forex and crypto across nine country markets — running as a single Node
+process on your own machine. No account, no cloud backend, no telemetry, one required
+dependency.
 
-## Analysis
+```
+27,117 companies and 12,329 ETFs bundled offline
+9 country markets + forex and crypto asset spaces
+85 modules · 64 API endpoints · 73 test suites
+```
 
-- **Screening** — a validated expression language over ~30 computed fields, natural-language
-  queries, quick filters, saved screens and a block query builder.
-- **Custom ratios** — define your own metric as arithmetic over existing fields
-  (`cfo / net_profit * 100`) and it becomes a column, a sort key and a screen condition.
-  Evaluated by a hand-written parser: no `eval`, no `Function`, no property access.
-- **Deep fundamentals** — owner earnings, cash conversion cycle, share dilution,
-  incremental ROIC, dividend safety against free cash flow, reinvestment rate,
-  common-size statements, DuPont, Piotroski F-score, Altman Z, Beneish M.
-- **Reverse DCF** — solves for the growth rate today's price implies, then states whether
-  that is ambitious or modest. Paired with bear/base/bull scenarios, a 5×5 sensitivity grid
-  and a margin of safety against each case.
-- **Company briefing** — an analyst-style written account composed from stored numbers:
-  four independent stances (value, quality, momentum, safety), explicit dissent when they
-  contradict, and falsifiers naming what would prove the view wrong.
-- **Decision journal** — record the thesis when you commit; the app grades your reasoning
-  against what actually happened and reports your own accuracy.
-- **Sector phases** — leading / improving / weakening / lagging from the year's trend, the
-  last month's momentum and breadth, with the evidence stated in words.
-- **Ranked candidates** — scored by how well independent dimensions agree, with
-  contradiction penalised, and every candidate stating what argues against it.
+## The idea
 
-## Data
+> **The instrument decides the market, not the other way round.**
 
-- **Live market data** — quotes, OHLCV, statements, dividends, splits, analysts, holdings,
-  insiders and news, fetched and stored per market.
-- **158 catalogued sources** across 15 data types, 10+ per type, each marked keyless or
-  key-required and tagged with the markets it covers.
-- **Failover engine** — priority order, retry with exponential backoff and jitter, a
-  circuit breaker that cools a failing source, and an honest report when every source fails.
-- **Working adapters** for Yahoo (quotes, history, fundamentals), Google News, Bing News,
-  World Bank, IMF and Wikidata — each verified live.
-- **Provenance on every row** — synthetic demo data is tagged `DEMO` wherever it appears;
-  real data carries its source name.
+Type `RELIANCE.NS`, `VOO`, `EURUSD=X` or `BTC-USD` and Atlas works out the asset class, the
+country, the currency and the trading hours from the symbol itself. There is no wrong-market
+state to get stuck in.
 
-## Keeping itself current
+## What it does
 
-A background scheduler refreshes prices, discovers newly listed symbols across all nine
-markets, tracks upcoming events and graduates pre-listing companies as they price. It
-rotates markets so no single source is hammered.
+**Stocks** — screening over ~30 computed fields, fundamentals, DCF and reverse DCF with
+scenarios and sensitivity, Piotroski/Altman/Beneish, a written briefing with falsifiers, 41
+alpha factors, peer percentiles, a graded decision journal, and 67 documented investor
+methods each runnable as a screen.
 
-## Markets
+**ETFs, forex, crypto** — each class gets the analysis that fits it, and only that. Pip size
+and session overlap for a currency pair; 24-hour trading and supply for a crypto asset.
+Where a class supports an analysis the data cannot fill, the gap is listed rather than
+approximated.
 
-India · United States · United Kingdom · Japan · Germany · Singapore · Hong Kong ·
-Australia · Canada. Each has its own SQLite file, currency, timezone and benchmark.
-Switching market swaps the database handle; a static guard fails the build if any code
-opens a database outside the market manager, and a browser test proves no row crosses.
+**Discovery** — sector phases, ranked candidates that always state what argues against them,
+instrument lifecycle tracking for new, upcoming and delisted listings.
 
-## Export
+**Local AI** — 10 models in a catalogue with plain-English descriptions and a device-fit
+check. The app downloads one itself, runs it through llama.cpp on-device, grounds every
+answer in stored numbers, and cross-checks what the model says. With no model installed the
+assistant answers deterministically from the data and tells you which engine answered.
 
-CSV, TSV and a native `.xlsx` written from scratch — numbers stay numeric so Excel can
-compute on them. No dependency added.
-
-## Quick start
+## Run it
 
 ```bash
-npm install          # one runtime dependency: better-sqlite3
+npm install          # one required dependency
 npm run build
-npm start            # http://127.0.0.1:8800
+npm start            # http://127.0.0.1:8787
 ```
 
-First run asks you to choose a country bundle — there is deliberately no default market.
-An empty market explains itself and offers demo data, a directory sync, or a single fetch.
+First open asks which country to install. Nothing is fetched until you ask for it.
+
+To add a local model:
 
 ```bash
-npm run verify:all   # 43 verification suites
+npm run get-model                              # downloads a 491 MB GGUF, verified
+ATLAS_MODEL_PATH=data/models/qwen2.5-0.5b-q4.gguf npm start
 ```
 
-## Building the Android app
+## Why it can be trusted
+
+- **Isolation is physical.** One SQLite file per market and asset class. A bug cannot leak
+  one market's rows into another, because they are different files. Proven at four levels.
+- **Unknown is not zero.** Ratios are nullable, so "no P/E" is distinguishable from "P/E of
+  0" — and a `P/E < 15` screen cannot silently include a company whose P/E was never known.
+- **Impossible values are rejected.** Every number passes a sanity boundary; a P/E of `1e308`
+  becomes `null`, not a lie.
+- **Provenance on every row.** Synthetic demo data is tagged on every row and never presented
+  as real.
+- **Offline by default.** Analysis works with the network unplugged, from bundled data.
+
+## Delivery
+
+| Target | Artefact |
+|---|---|
+| Web / PWA | `atlas-pwa.zip` |
+| Android | `atlas-release.apk` (signed v1/v2/v3) |
+| Windows | `atlas.exe` (PE32+ x64) |
+| Source | `atlas-platform.zip` |
+
+## Documentation
+
+- [`docs/PRD.md`](docs/PRD.md) — product requirements, as built, with measured numbers and
+  stated limitations
+- [`docs/OPERATIONS.md`](docs/OPERATIONS.md) — deployment, testing, scalability, technical debt
+- [`docs/DESIGN-SYSTEM.md`](docs/DESIGN-SYSTEM.md) — the token layer and component rules
+- [`docs/DATA-POLICY.md`](docs/DATA-POLICY.md) — what is fetched, and what is permanently refused
+- [`docs/REFERENCE-STUDY.md`](docs/REFERENCE-STUDY.md) — what was learned from outside projects
+
+## Test
 
 ```bash
-bash scripts/install-toolchain.sh   # JDK 17, build-tools 34, platform 34
-bash scripts/build-apk.sh           # signed release APK, no Gradle
+npm test              # all suites
+node scripts/verify-<name>.js
 ```
 
-The keystore is generated from documented values at build time, so no binary secret needs
-to survive between machines.
+The suites that matter most: `feature-inventory`, `market-purity`, `multasset`, `fullstack`,
+`shapes`, `null-pipeline`, `data-quality`, `robustness`, `design`.
 
-## Honest status
+## Licence
 
-- Market data comes from an **unofficial** Yahoo source with 4–5 years of history. The best
-  competitors carry 10+; closing that is a data-source problem, not a code one.
-- Of 158 catalogued sources, **23 have a working adapter**. The rest are catalogued and
-  either blocked from this network or need a free key. Building an adapter that cannot be
-  run would be untested code presented as working, which this project does not do.
-- Demo data is synthetic and labelled `DEMO` on every row and every company page.
-- On-device model inference is unmanaged: the catalogue and installer are complete and
-  tested, but no quantised model has been run end to end.
-- The Windows EXE is not built — Electron's binary truncates through this network.
-- Licence: MIT.
+MIT — see [LICENSE](LICENSE).
+
+Atlas is analysis software. It is not investment advice, and it does not place orders.

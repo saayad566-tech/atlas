@@ -3,7 +3,7 @@
   "version": "3.4.1",
   "private": true,
   "type": "commonjs",
-  "description": "Atlas \u2014 a local-first platform for deep fundamental analysis across nine markets",
+  "description": "Local-first multi-asset investment analysis: stocks, ETFs, forex and crypto across nine markets, offline by default.",
   "license": "MIT",
   "main": "dist/gateway.js",
   "scripts": {
@@ -91,7 +91,8 @@
     "verify:shapes": "node scripts/verify-shapes.js",
     "build:exe": "npx @yao-pkg/pkg dist/gateway.js --targets node20-win-x64 --output build/atlas.exe",
     "verify:unproven": "node scripts/verify-unproven.js",
-    "verify:model-download": "node scripts/verify-model-download.js"
+    "verify:model-download": "node scripts/verify-model-download.js",
+    "get-model": "bash scripts/get-model.sh"
   },
   "dependencies": {
     "better-sqlite3": "^11.5.0"
@@ -105,7 +106,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/atlas/atlas"
+    "url": "https://github.com/saayad566-tech/atlas.git"
   },
   "pkg": {
     "scripts": [
@@ -121,5 +122,21 @@
   },
   "optionalDependencies": {
     "node-llama-cpp": "^3.22.2"
-  }
+  },
+  "homepage": "https://github.com/saayad566-tech/atlas#readme",
+  "bugs": {
+    "url": "https://github.com/saayad566-tech/atlas/issues"
+  },
+  "keywords": [
+    "stocks",
+    "etf",
+    "forex",
+    "crypto",
+    "screener",
+    "fundamental-analysis",
+    "local-first",
+    "offline",
+    "sqlite",
+    "llm"
+  ]
 }
