@@ -60,6 +60,7 @@ import { ask } from '../core/ask';
 import { ADVISORS, advisorsFor, findAdvisor, runMethod, libraryCoverage, methodExpression } from '../core/advisors';
 import { priceHistory, dataCoverage, type Interval } from '../core/pricehistory';
 import { marketNews, persistNews, storedNews, newsCoverage } from '../core/newsroom';
+import { sessionFor, allSessions } from '../core/session';
 import { listStrategies, saveStrategy, deleteStrategy, recordStrategyResult, compileConditions } from '../core/strategy';
 import { registrySummary, sourcesFor, SOURCE_REGISTRY } from '../core/sourceRegistry';
 import { SourcePool, runWithFailover } from '../core/failover';
@@ -1477,6 +1478,14 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       // ---- investor library: documented methods, runnable as screens ----
       // ---- back data: browse any stored date range ----
       // ---- newsroom: per-country market news, cached for offline reading ----
+      // ---- trading sessions ----
+      if (p === '/api/session') {
+        return json(res, 200, { sessions: allSessions(), note: 'Exchange holidays are not modelled; weekends and daily hours are.' });
+      }
+      if (p.startsWith('/api/session/')) {
+        const s = sessionFor(decodeURIComponent(p.slice('/api/session/'.length)));
+        return s ? json(res, 200, s) : json(res, 404, { error: 'No session defined for that market' });
+      }
       if (p === '/api/newsroom/coverage') {
         return json(res, 200, { markets: newsCoverage() });
       }

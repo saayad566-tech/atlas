@@ -61,6 +61,7 @@ run resilient verify-resilience.js
 run newsroom  verify-newsroom.js
 run mkt-scope verify-market-scope.js
 run filters   verify-filters-models.js
+run session   verify-session-cmdk.js
 run provenance verify-provenance.js
 run failover  verify-failover.js
 run adapters  verify-adapters.js

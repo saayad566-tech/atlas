@@ -340,3 +340,15 @@ body.wall #result-body td, body.wall #result-head th { font-size: 15px; padding:
 
 /* A class with display:flex would otherwise beat the hidden attribute. */
 [hidden] { display: none !important; }
+
+.cmdk { position: fixed; inset: 0; z-index: 200; background: rgba(2,6,23,.62); display: flex;
+  align-items: flex-start; justify-content: center; padding-top: 12vh; backdrop-filter: blur(3px); }
+.cmdkbox { width: min(640px, 92vw); background: var(--panel, #fff); border: 1px solid var(--line, #e2e8f0);
+  border-radius: 14px; box-shadow: 0 24px 60px rgba(2,6,23,.35); overflow: hidden; }
+.cmdkbox .input { width: 100%; border: 0; border-bottom: 1px solid var(--line, #e2e8f0); border-radius: 0;
+  padding: 14px 16px; font-size: 15px; outline: none; background: transparent; }
+.cmdklist { max-height: 46vh; overflow: auto; }
+.cmdkitem { display: flex; justify-content: space-between; gap: 10px; padding: 9px 16px; cursor: pointer; font-size: 13px; }
+.cmdkitem[data-active="1"] { background: var(--hover, #f1f5f9); }
+.cmdkitem .s { color: var(--muted, #64748b); font-variant-numeric: tabular-nums; }
+.session-open { color: #059669; } .session-closed { color: #64748b; } .session-lunch { color: #d97706; }

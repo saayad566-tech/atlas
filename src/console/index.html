@@ -57,6 +57,7 @@
     <input id="global-search" class="input sm" placeholder="Search any stock…" aria-label="Search stocks" style="max-width:220px" />
     <button class="btn sm ghost" id="btn-format" title="Toggle crore / million" aria-label="Toggle number format">₹Cr</button>
     <button class="btn sm ghost" id="btn-help" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">?</button>
+    <span class="chip" id="session-badge" title="Trading session" hidden></span>
     <select id="market-select" class="input sm" aria-label="Market" title="Download and switch country bundles"></select>
     <button class="navbtn" data-view="compare">Compare</button>
     <button class="navbtn" data-view="store">AI Store</button>
@@ -429,5 +430,12 @@
   }
 </script>
 <div class="statusline" id="health-line" aria-live="polite"></div>
+<div id="cmdk" class="cmdk" hidden role="dialog" aria-modal="true" aria-label="Search stocks">
+    <div class="cmdkbox">
+      <input id="cmdk-input" class="input" aria-label="Search any company" placeholder="Search any company, or type a command…" autocomplete="off" />
+      <div id="cmdk-list" class="cmdklist"></div>
+      <div class="hint" style="padding:8px 12px">↑↓ to move · Enter to open · Esc to close</div>
+    </div>
+  </div>
 </body>
 </html>

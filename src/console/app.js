@@ -77,6 +77,88 @@ function marketParam(key = 'market') {
   return m ? `&${key}=${encodeURIComponent(m)}` : '';
 }
 
+
+// ---- trading session badge -------------------------------------------------
+async function loadSession() {
+  const el = $('#session-badge');
+  if (!el) return;
+  try {
+    const m = activeMarket();
+    const s = m ? await api(`/api/session/${encodeURIComponent(m)}`) : (await api('/api/session')).sessions[0];
+    if (!s) { el.hidden = true; return; }
+    el.hidden = false;
+    el.textContent = s.phase === 'open' ? '● Open' : s.phase === 'lunch' ? '◐ Lunch' : s.phase === 'pre' ? '◑ Pre' : s.phase === 'after' ? '◑ After' : '○ Closed';
+    el.className = `chip session-${s.phase === 'open' ? 'open' : s.phase === 'lunch' ? 'lunch' : 'closed'}`;
+    el.title = `${s.label} · local time ${s.localTime} (${s.timezone})`;
+  } catch { el.hidden = true; }
+}
+
+// ---- command palette -------------------------------------------------------
+let cmdkItems = [];
+let cmdkIndex = 0;
+
+function cmdkRender() {
+  const list = $('#cmdk-list');
+  if (!list) return;
+  list.innerHTML = cmdkItems.length
+    ? cmdkItems.map((it, i) => `<div class="cmdkitem" data-i="${i}" data-active="${i === cmdkIndex ? '1' : '0'}">
+        <span>${esc(it.name)}${it.demo ? ' <span class="demotag">DEMO</span>' : ''}</span>
+        <span class="s">${esc(it.symbol)} · ${esc(it.sector || '')}</span></div>`).join('')
+    : '<div class="cmdkitem">No match. Try a different name or symbol.</div>';
+  list.querySelectorAll('[data-i]').forEach((el) => {
+    el.onclick = () => cmdkChoose(Number(el.dataset.i));
+  });
+}
+
+function cmdkChoose(i) {
+  const it = cmdkItems[i];
+  if (!it) return;
+  cmdkClose();
+  openCompany(it.symbol);
+}
+
+function cmdkOpen() {
+  const el = $('#cmdk');
+  if (!el) return;
+  el.hidden = false;
+  const input = $('#cmdk-input');
+  if (input) { input.value = ''; input.focus(); }
+  cmdkSearch('');
+}
+
+function cmdkClose() {
+  const el = $('#cmdk');
+  if (el) el.hidden = true;
+}
+
+async function cmdkSearch(q) {
+  try {
+    const r = await api(`/api/directory/search?q=${encodeURIComponent(q)}&limit=12`);
+    cmdkItems = (r.results || r.rows || []).map((x) => ({ symbol: x.symbol, name: x.name || x.symbol, sector: x.sector, demo: x.source === 'fixture' }));
+  } catch { cmdkItems = []; }
+  cmdkIndex = 0;
+  cmdkRender();
+}
+
+function wireCommandPalette() {
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); cmdkOpen(); return; }
+    const open = $('#cmdk') && !$('#cmdk').hidden;
+    if (!open) return;
+    if (e.key === 'Escape') { e.preventDefault(); cmdkClose(); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); cmdkIndex = Math.min(cmdkIndex + 1, cmdkItems.length - 1); cmdkRender(); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); cmdkIndex = Math.max(cmdkIndex - 1, 0); cmdkRender(); }
+    if (e.key === 'Enter') { e.preventDefault(); cmdkChoose(cmdkIndex); }
+  });
+  const input = $('#cmdk-input');
+  if (input) {
+    let t = null;
+    input.oninput = () => { clearTimeout(t); t = setTimeout(() => cmdkSearch(input.value.trim()), 180); };
+  }
+  const overlay = $('#cmdk');
+  if (overlay) overlay.onclick = (e) => { if (e.target === overlay) cmdkClose(); };
+}
+
 async function api(path, opts) {
   const tok = authToken();
   const headers = { 'Content-Type': 'application/json', ...(tok ? { authorization: `Bearer ${tok}` } : {}), ...(opts && opts.headers ? opts.headers : {}) };
@@ -2678,6 +2760,7 @@ function wire() {
     if (active) { state.market = active; document.body.dataset.market = active; }
   } catch { /* the market is unknown; server defaults apply */ }
 })();
+wireCommandPalette();
 void bootSetup().then((ready) => { if (ready) { loadSavedScreens(); loadSectors(); loadFields(); loadMarkets(); loadHealth(); } });
   if (false) loadSavedScreens();
   loadSectors();
