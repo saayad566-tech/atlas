@@ -23,7 +23,13 @@ try {
   ctx = await model.createContext({ contextSize: 1024, threads: 2 });
   console.log(JSON.stringify({ ready: true, size: model.size }));
 } catch (e) {
-  console.log(JSON.stringify({ ready: false, error: String(e && e.message ? e.message : e).slice(0, 300) }));
+  const msg = String(e && e.message ? e.message : e);
+  // An optional dependency that was never installed is not a crash: say so plainly and let
+  // the caller fall back to the deterministic answer path.
+  const friendly = /Cannot find package|ERR_MODULE_NOT_FOUND/.test(msg)
+    ? 'node-llama-cpp is not installed — run: npm install node-llama-cpp'
+    : msg.slice(0, 300);
+  console.log(JSON.stringify({ ready: false, error: friendly }));
   process.exit(1);
 }
 

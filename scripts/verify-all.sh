@@ -76,6 +76,7 @@ run nulls     verify-null-pipeline.js
 run robust    verify-robustness.js
 run shapes    verify-shapes.js
 run unproven  verify-unproven.js
+run mdl-dl    verify-model-download.js
 run provenance verify-provenance.js
 run failover  verify-failover.js
 run adapters  verify-adapters.js

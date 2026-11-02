@@ -185,3 +185,60 @@ export class HttpSession {
     try { return { status: res.status, json: JSON.parse(res.body) as T }; } catch { return { status: res.status, json: null }; }
   }
 }
+
+/**
+ * Stream a URL straight to a file, through https_proxy when one is configured.
+ *
+ * A model is hundreds of megabytes: buffering it in memory would be wasteful, and Node's
+ * built-in fetch ignores the proxy environment, so this reuses the same CONNECT tunnel as
+ * the text client and pipes the response to disk.
+ */
+export async function httpsDownloadToFile(
+  urlStr: string,
+  dest: string,
+  onProgress?: (bytes: number, total: number | null) => void,
+  headers: Record<string, string> = {},
+  redirects = 0,
+): Promise<{ ok: boolean; bytes: number; total: number | null; error: string | null }> {
+  const fsMod = await import('node:fs');
+  const url = new URL(urlStr);
+  const proxy = process.env['https_proxy'] ?? process.env['HTTPS_PROXY'] ?? process.env['http_proxy'] ?? process.env['HTTP_PROXY'];
+  const hdrs = { 'Accept-Encoding': 'identity', ...headers };
+
+  const write = (res: import('node:http').IncomingMessage): Promise<{ ok: boolean; bytes: number; total: number | null; error: string | null }> =>
+    new Promise((resolve) => {
+      const total = Number(res.headers['content-length'] ?? 0) || null;
+      let bytes = 0;
+      const out = fsMod.createWriteStream(dest);
+      res.on('data', (c: Buffer) => { bytes += c.length; out.write(c); if (onProgress) onProgress(bytes, total); });
+      res.on('end', () => { out.end(() => resolve({ ok: true, bytes, total, error: null })); });
+      res.on('error', (e: Error) => { out.end(() => resolve({ ok: false, bytes, total, error: e.message })); });
+    });
+
+  try {
+    if (proxy) {
+      const socket = await connectTunnel(new URL(proxy), url.hostname, Number(url.port || 443));
+      const res = await new Promise<import('node:http').IncomingMessage>((resolve, reject) => {
+        const req = https.request({ host: url.hostname, path: url.pathname + url.search, method: 'GET', headers: hdrs, createConnection: () => socket as unknown as import('node:net').Socket, servername: url.hostname }, resolve);
+        req.on('error', reject);
+        req.end();
+      });
+      const loc = res.headers['location'];
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && typeof loc === 'string' && redirects < 3) {
+        res.resume();
+        return httpsDownloadToFile(new URL(loc, url).toString(), dest, onProgress, headers, redirects + 1);
+      }
+      if ((res.statusCode ?? 0) !== 200) { res.resume(); return { ok: false, bytes: 0, total: null, error: `HTTP ${res.statusCode}` }; }
+      return await write(res);
+    }
+    const res = await new Promise<import('node:http').IncomingMessage>((resolve, reject) => {
+      const req = https.request({ host: url.hostname, path: url.pathname + url.search, method: 'GET', headers: hdrs }, resolve);
+      req.on('error', reject);
+      req.end();
+    });
+    if ((res.statusCode ?? 0) !== 200) { res.resume(); return { ok: false, bytes: 0, total: null, error: `HTTP ${res.statusCode}` }; }
+    return await write(res);
+  } catch (e) {
+    return { ok: false, bytes: 0, total: null, error: e instanceof Error ? e.message : 'download failed' };
+  }
+}

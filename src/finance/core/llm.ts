@@ -57,9 +57,18 @@ class LlamaRuntime {
     this.modelPath = process.env['ATLAS_MODEL_PATH'] ?? null;
   }
 
+  /**
+   * The configured model path, read at call time rather than captured at construction.
+   * Reading it once meant an environment set after import was silently ignored.
+   */
+  private path(): string | null {
+    return process.env['ATLAS_MODEL_PATH'] ?? this.modelPath ?? null;
+  }
+
   /** True when a model file is configured and present on disk. */
   configured(): boolean {
-    return !!this.modelPath && fs.existsSync(this.modelPath);
+    const p = this.path();
+    return !!p && fs.existsSync(p);
   }
 
   get error(): string | null { return this.loadError; }
@@ -75,7 +84,8 @@ class LlamaRuntime {
     if (this.ready && this.child) return true;
     if (this.starting) return this.starting;
     if (!this.configured()) {
-      this.loadError = this.modelPath ? `model file not found at ${this.modelPath}` : 'no ATLAS_MODEL_PATH set';
+      const p = this.path();
+      this.loadError = p ? `model file not found at ${p}` : 'no ATLAS_MODEL_PATH set';
       return false;
     }
     this.starting = new Promise<boolean>((resolve) => {
@@ -84,7 +94,7 @@ class LlamaRuntime {
           const { spawn } = await import('node:child_process');
           const bridge = path.join(__dirname, '..', '..', '..', 'scripts', 'llama-bridge.mjs');
           if (!fs.existsSync(bridge)) { this.loadError = 'bridge script missing'; return resolve(false); }
-          const child = spawn(process.execPath, [bridge, this.modelPath!], { stdio: ['pipe', 'pipe', 'pipe'] });
+          const child = spawn(process.execPath, [bridge, this.path()!], { stdio: ['pipe', 'pipe', 'pipe'] });
           this.child = child;
           let settled = false;
           const done = (ok: boolean): void => { if (!settled) { settled = true; resolve(ok); } };

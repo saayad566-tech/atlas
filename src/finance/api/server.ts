@@ -66,6 +66,7 @@ import { bundledMarkets, searchUniverse, universeStats, importInto } from '../co
 import { resolve, resolveOrExplain, storageKey } from '../core/resolve';
 import { countryMarkets } from '../core/markets';
 import { analyseInstrument } from '../core/instrument';
+import { downloadModel, progressOf, directUrl } from '../core/modeldownload';
 import { seedFromBundle } from '../core/directory';
 import { reconcile, listings, listingSummary, markUpcoming, recentlyAdded, type ListingState } from '../core/listings';
 import { perf } from '../core/perf';
@@ -1629,6 +1630,22 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
         const a = analyseInstrument(db.db, r.symbol, r.assetClass);
         if (!a) return json(res, 200, { ...r, assetClass: r.assetClass, note: 'Stocks use the company view, which has deeper panels.', stock: true });
         return json(res, 200, { ...a, resolution: r, classDef: assetDef(r.assetClass) });
+      }
+      // ---- model download ----
+      if (p === '/api/models/download' && req.method === 'POST') {
+        const b = (await readBody(req)) as { id?: string };
+        const id = String(b.id ?? '');
+        if (!id) return json(res, 400, { error: 'Provide a model id' });
+        if (!directUrl(id)) return json(res, 404, { error: `No download URL known for "${id}"` });
+        const dir = path.join(dataDir ?? path.join(process.cwd(), 'data'), 'models');
+        // Downloads take minutes; report progress rather than blocking the caller.
+        void downloadModel(id, dir).catch(() => { /* recorded in progressOf */ });
+        return json(res, 202, { started: true, id, note: 'Poll /api/models/download/status for progress.' });
+      }
+      if (p === '/api/models/download/status') {
+        const id = url.searchParams.get('id') ?? '';
+        const pr = progressOf(id);
+        return pr ? json(res, 200, pr) : json(res, 404, { error: 'No download for that id' });
       }
       // ---- asset classes and instrument-first navigation ----
       if (p === '/api/assets') {
