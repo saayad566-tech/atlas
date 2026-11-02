@@ -66,6 +66,7 @@ run alpha     verify-alpha.js
 run universe  verify-universe-bundle.js
 run inventory verify-feature-inventory.js
 run mkt-purity verify-market-purity.js
+run design    verify-design.js
 run provenance verify-provenance.js
 run failover  verify-failover.js
 run adapters  verify-adapters.js

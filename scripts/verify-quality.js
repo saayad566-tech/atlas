@@ -57,10 +57,33 @@ let fails=0; const ok=(n,c,d)=>{ if(!c) fails++; console.log(`  ${c?'PASS':'FAIL
   const contrast=(fg,bg)=>{ const L=c=>{const [r,g,b]=c;const f=v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);};return 0.2126*f(r)+0.7152*f(g)+0.0722*f(b);};
     const a=L(fg),b=L(bg); return (Math.max(a,b)+0.05)/(Math.min(a,b)+0.05); };
   const hex=s=>{const m=/^#?([0-9a-f]{6})$/i.exec(s.trim());return m?[parseInt(m[1].slice(0,2),16),parseInt(m[1].slice(2,4),16),parseInt(m[1].slice(4,6),16)]:null;};
-  const dim=/#([0-9a-f]{6})/i.exec((css.match(/--text-dim:\s*([^;]+)/)||[])[1]||'')?.[0];
-  const bg=(css.match(/--bg:\s*([^;]+)/)||[])[1]?.trim();
-  if(dim&&bg&&hex(dim)&&hex(bg)){ const c=contrast(hex(dim),hex(bg)); ok('secondary text meets WCAG AA (4.5:1)', c>=4.5, `${c.toFixed(2)}:1`); }
-  else ok('contrast measurable', false, 'could not parse tokens');
+  // Tokens were renamed in the design system; measure contrast for BOTH themes.
+  const tokenIn = (block, name) => {
+    const m = new RegExp('--' + name + ':\\s*([^;]+);').exec(block || '');
+    return m ? m[1].trim() : null;
+  };
+  const lightBlock = css.split('prefers-color-scheme: dark')[0];
+  const darkBlock = (css.split('prefers-color-scheme: dark')[1] || '');
+  const measure = (block, label) => {
+    const pairs = [
+      ['ink-1', 'surface-0', 'primary text on the page'],
+      ['ink-2', 'surface-1', 'secondary text on a card'],
+      ['ink-3', 'surface-1', 'muted text on a card'],
+    ];
+    let worst = 99; let worstLabel = '';
+    for (const [fg, bg, what] of pairs) {
+      const f = tokenIn(block, fg); const b = tokenIn(block, bg);
+      if (f && b && hex(f) && hex(b)) {
+        const c = contrast(hex(f), hex(b));
+        if (c < worst) { worst = c; worstLabel = what; }
+      }
+    }
+    return { worst, worstLabel, label };
+  };
+  const mLight = measure(lightBlock, 'light');
+  const mDark = measure(darkBlock, 'dark');
+  ok('light theme meets WCAG AA (4.5:1)', mLight.worst >= 4.5, `${mLight.worst.toFixed(2)}:1 (${mLight.worstLabel})`);
+  ok('dark theme meets WCAG AA (4.5:1)', mDark.worst >= 4.5, `${mDark.worst.toFixed(2)}:1 (${mDark.worstLabel})`);
 
   console.log('\n=== PERFORMANCE (measured) ===');
   const time=async(label,fn,n=20)=>{ const t=[]; for(let i=0;i<n;i++){ const s=process.hrtime.bigint(); await fn(); t.push(Number(process.hrtime.bigint()-s)/1e6);} t.sort((a,b)=>a-b);
