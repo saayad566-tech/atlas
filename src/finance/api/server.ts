@@ -74,7 +74,13 @@ import { RefreshScheduler } from '../core/scheduler';
 export interface ServerOptions { dbFile?: string; port?: number; consoleDir?: string }
 
 function json(res: http.ServerResponse, code: number, body: unknown): void {
-  const payload = JSON.stringify(body);
+  // Every JSON response carries the moment it was produced. Without it a client cannot
+  // tell a cached answer from a fresh one, and "as of when" becomes unknowable.
+  let out = body;
+  if (body && typeof body === 'object' && !Array.isArray(body) && !('generatedAt' in (body as Record<string, unknown>))) {
+    out = { ...(body as Record<string, unknown>), generatedAt: new Date().toISOString() };
+  }
+  const payload = JSON.stringify(out);
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(payload);
 }
