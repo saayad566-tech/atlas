@@ -1,116 +1,272 @@
-# Product Requirements — Sift (local-first screener)
+# Atlas — Product Requirements Document
 
-## 1. Problem
+**Version** 3.0 · **Status** proposal for review · **Date** 2 November 2026
+**Supersedes** the implicit scope of v2.7.0, which is a stock-only product.
 
-Screening Indian equities usually means a web service: your queries, watchlists and
-research habits live on someone else's server, behind a subscription, and stop
-working offline. The analytical work — comparing ten years of statements, checking
-leverage and cash conversion — is arithmetic over public filings, not a service.
+---
 
-## 2. Goal
+## 1. What Atlas is today
 
-A **single-user, offline-first** screener that:
+A local-first analysis platform that runs as one Node process on the user's own machine.
+No account, no backend, one runtime dependency, all data in SQLite files the user owns.
 
-1. stores 10+ years of statements for thousands of companies in one local file;
-2. answers arbitrary screening expressions in milliseconds;
-3. accepts natural language without requiring a model or a network;
-4. explains *why* a company looks risky, from the numbers themselves.
+**What exists and works (v2.7.0):**
 
-Non-goals: live tick streaming, brokerage integration, multi-user accounts, advice.
+| Area | Detail |
+|---|---|
+| Markets | 9 countries, one SQLite file each, isolation proven at four levels |
+| Universe | 27,117 companies bundled offline from FinanceDatabase (MIT) |
+| Screening | expression language, natural-language queries, custom ratios usable as columns and filters |
+| Fundamentals | statements, ratios, Piotroski/Altman/Beneish, owner earnings, CCC, dilution, incremental ROIC, dividend safety |
+| Valuation | DCF, reverse DCF, bear/base/bull scenarios, sensitivity grid, margin of safety |
+| Analysis | written briefing with falsifiers, 41 alpha factors, multi-year trends, peer percentiles |
+| Discovery | sector phases, ranked candidates that state what argues against them |
+| Judgment | decision journal graded against what actually happened |
+| Methods | 67 documented investor methods, market-scoped, runnable as screens |
+| Data | 158 catalogued sources, failover with retry and cooldown, newsroom per country, back-data browser |
+| Interface | own design system, 179 tokens, real dark mode, WCAG AA in both themes |
 
-## 3. Users
+**What it is not:** it only understands **stocks**.
 
-- **The self-directed investor** who wants repeatable screens and full data ownership.
-- **The analyst** who needs to compare statements across peers quickly.
-- **The tinkerer** who wants a queryable local dataset and an API.
+---
 
-## 4. Functional requirements
+## 2. The change being proposed
 
-### 4.1 Data architecture
-- **FR-1** Companies, sectors, industries, currency, source, listing.
-- **FR-2** Annual and quarterly statements: P&L, balance sheet, cash flow, working
-  capital — one row per company-period, idempotent on re-ingest.
-- **FR-3** Ratios pre-computed per period (ROE, ROCE, D/E, P/E, P/B, margins, growth).
-- **FR-4** Shareholding (promoter/FII/DII/public/pledge) per period.
-- **FR-5** Peer groups (top 5 by market cap within a sector).
-- **FR-6** A flat `v_latest` view so a screen is one scan, not a join fan-out.
-- **FR-7** Ingestion is pluggable: a bundled demo pack, plus an EDGAR adapter.
-- **FR-8** The balance sheet must balance; a test asserts `assets = liabilities`.
+Atlas becomes a **multi-asset platform**. Four asset classes — **stocks, ETFs, forex,
+crypto** — each working independently, each with its own data, its own analysis and its own
+screen.
 
-### 4.2 Screener logic engine
-- **FR-9** Expression grammar: comparisons, `AND`/`OR`/`NOT`, parentheses, arithmetic,
-  numeric suffixes (`Cr`, `lakh crore`, `%`).
-- **FR-10** A field whitelist with human aliases ("P/E", "debt to equity", "mcap").
-- **FR-11** Compilation to SQL with **bound parameters only**; user text never
-  reaches SQL. Injection attempts are rejected with a clear error.
-- **FR-12** Unknown fields produce a message naming valid alternatives.
-- **FR-13** Natural language → the same expression, deterministically, offline.
-- **FR-14** Unparsed clauses are reported, never silently dropped.
-- **FR-15** Optional local model; its output is validated before use, else rules.
+And one inversion that changes the whole navigation model:
 
-### 4.3 UI
-- **FR-16** Global typeahead search over name and symbol.
-- **FR-17** Screener bar with both a natural-language input and an expression input,
-  kept in sync (the expression is always visible after a run).
-- **FR-18** Dense results table: sortable columns, sticky header, tabular numerals,
-  Indian digit grouping, red/green for negative/positive deltas.
-- **FR-19** Click a row → company view.
-- **FR-20** Company view: header metrics grid, health score with red flags, and tabs
-  for Annual P&L, Quarterly, Balance Sheet, Cash Flow, Ratios, Shareholding, Peers.
-- **FR-21** Empty state, loading state, and a CSV export of any screen.
-- **FR-22** Keyboard: `/` focuses search, `Esc` closes the typeahead.
-- **FR-23** Demo data is labelled wherever it appears.
+> **The instrument decides the market, not the other way round.**
 
-### 4.4 Analysis
-- **FR-24** Red flags: high leverage, weak interest cover, negative CFO, profit not
-  converting to cash, sales/profit decline, margin compression, receivables outpacing
-  sales, promoter pledge, low promoter holding, losses.
-- **FR-25** A 0–100 health score with a verdict (strong / fair / weak) and a
-  one-paragraph summary naming the drivers.
+Today the user picks a country, then browses stocks in it. After this change the user picks
+an instrument — `RELIANCE.NS`, `VOO`, `EURUSD`, `BTC-USD` — and Atlas derives everything
+else: which asset class it belongs to, which country, which currency, which exchange hours,
+which analysis applies.
 
-### 4.5 Performance
-- **FR-26** Seed 200 companies × 10 years in under 2 s.
-- **FR-27** Screen query under 50 ms at 200 companies; under 200 ms at 5,000.
-- **FR-28** The results table keeps the DOM small (paged, "Load more").
+---
 
-## 5. Non-functional requirements
+## 3. Why this inversion matters
 
-- **NFR-1** 100% free and open source; no API keys, no paid tier, no telemetry.
-- **NFR-2** Works with the network unplugged (demo pack is local).
-- **NFR-3** One SQLite file; backup = copy the file.
-- **NFR-4** No user query text is ever executed as SQL.
-- **NFR-5** Tests cover the parser, compiler, store, analysis and the EDGAR mapping.
-- **NFR-6** The UI is verified headlessly against real Chromium.
+| Today | After |
+|---|---|
+| Pick country → see stocks | Pick anything → Atlas knows the country |
+| Wrong market selected = empty screen | Impossible: the instrument carries its market |
+| Switching markets loses your place | Switching instruments keeps your context |
+| One analysis engine for everything | The right analysis for the asset class |
 
-## 6. Data pipeline
+The current model has a real failure mode: a user who searches `AAPL` while India is active
+gets nothing. The inversion removes that class of bug entirely.
+
+---
+
+## 4. Asset classes and what each needs
+
+### 4.1 Stocks — already built
+Fundamentals, valuation, scores, briefing, peers. **No new work beyond registration.**
+
+### 4.2 ETFs — new
+| Need | Detail |
+|---|---|
+| Identity | ticker, name, issuer, domicile, inception date |
+| Cost | expense ratio, tracking difference |
+| Composition | holdings, sector weights, top-10 concentration |
+| Size | AUM, average daily volume, bid-ask spread |
+| Risk | tracking error vs benchmark, volatility, drawdown |
+| Analysis | "is this ETF cheap for what it holds", overlap with another ETF |
+
+### 4.3 Forex — new
+| Need | Detail |
+|---|---|
+| Identity | pair, base, quote, pip size, lot convention |
+| Rates | spot, bid/ask, forward points where available |
+| Carry | interest rate differential between the two currencies |
+| Sessions | the pair trades in overlapping sessions — London, New York, Tokyo |
+| Analysis | range position, volatility in pips, carry direction, session activity |
+
+### 4.4 Crypto — new
+| Need | Detail |
+|---|---|
+| Identity | symbol, network, contract address where applicable |
+| Market | price, volume, market cap, circulating vs total supply |
+| Risk | volatility (far higher than equities), drawdown, liquidity depth |
+| Sessions | 24/7 — the session model must say "always open", not force a fake close |
+| Analysis | supply schedule, dominance, correlation with majors |
+
+---
+
+## 5. Architecture
+
+### 5.1 Storage: one file per (asset class × market)
+
+Today: `data/markets/IN.db`
+
+After: `data/markets/IN-STOCK.db`, `US-ETF.db`, `GB-ETF.db`, `FX-FOREX.db`, `GLOBAL-CRYPTO.db`
+
+**Why not one file with an `asset_class` column:** the isolation guarantee is currently
+physical — separate files mean a bug cannot leak one market's rows into another. Adding a
+column would replace a structural guarantee with a filter someone can forget. Keep it
+physical.
+
+**Migration:** `IN.db` becomes `IN-STOCK.db` on first run, with the old file kept until the
+new one is verified.
+
+### 5.2 Instrument resolution
+
+New module `resolve.ts`:
 
 ```
-demo pack (deterministic, seeded)  ─┐
-EDGAR companyfacts (10-K, free)    ─┼─► normalise ─► INSERT OR REPLACE ─► SQLite
-future: NSE/BSE adapter            ─┘                                    │
-                                                                         ▼
-                                                        ratios → v_latest → screener
+resolve("RELIANCE.NS")  → { assetClass: 'stock', market: 'IN',  currency: 'INR', exchange: 'NSE' }
+resolve("VOO")          → { assetClass: 'etf',   market: 'US',  currency: 'USD', exchange: 'NYSEARCA' }
+resolve("EURUSD=X")     → { assetClass: 'forex', market: 'FX',  currency: 'USD', base: 'EUR' }
+resolve("BTC-USD")      → { assetClass: 'crypto',market: 'GLOBAL', currency: 'USD' }
 ```
 
-Normalisation rules: only annual 10-K/FY facts for the annual series; latest filing
-wins per period; missing tags leave the field at 0 rather than inventing a value.
+Rules, in order: explicit suffix → known exchange prefix → symbol shape → bundled universe
+lookup → unknown. An unknown symbol is **refused**, never guessed into a market.
+
+### 5.3 Switching by instrument
+
+`POST /api/focus { symbol }` — resolves the symbol, switches asset class and market if
+needed, and returns the resolved context. The console then reloads with that context.
+
+### 5.4 What must not regress
+
+The four isolation proofs must extend to asset classes:
+
+1. Separate files (physical)
+2. Static source guard (no cross-handle construction)
+3. Browser test (switch and read the page)
+4. Market-purity test (endpoints follow the switch)
+
+---
+
+## 6. Interface
+
+### 6.1 Asset switcher
+A control beside the market selector: `Stocks · ETFs · Forex · Crypto`. Choosing one filters
+the universe and the screens to that class. It is a **filter over what exists**, not a
+separate app.
+
+### 6.2 Instrument-first search
+`Ctrl+K` already searches stocks. It extends to all four classes, each result showing its
+class and market:
+
+```
+RELIANCE.NS   Stock · India · Energy
+VOO           ETF   · United States · S&P 500
+EURUSD=X      Forex · EUR/USD
+BTC-USD       Crypto · Bitcoin
+```
+
+Choosing a result **sets the market**, then opens the instrument.
+
+### 6.3 Analysis panel per class
+The company view becomes an instrument view whose panels depend on class:
+
+- **Stock** — fundamentals, valuation, scores, briefing, peers, journal
+- **ETF** — holdings, cost, tracking, overlap, exposure
+- **Forex** — rate, carry, session overlap, pip volatility
+- **Crypto** — supply, liquidity, volatility, dominance
+
+Panels that do not apply are absent, not empty.
+
+---
 
 ## 7. Acceptance criteria
 
-| # | Criterion | Verified by |
+A release is accepted when **all** of these pass:
+
+1. `resolve()` returns the correct class and market for 40+ symbols across all four classes.
+2. An unknown symbol is refused with a clear message, never assigned to a market.
+3. Switching from a stock to an ETF changes the asset class **and** the market when needed.
+4. After switching, no instrument from the previous class appears anywhere in the UI.
+5. Each class's analysis panels render with real stored data — no placeholders.
+6. Sessions say "24/7" for crypto instead of inventing a close.
+7. Forex shows the session overlap correctly across London/New York/Tokyo.
+8. The 63 existing suites still pass, including the feature inventory.
+9. Four isolation proofs hold across asset classes as well as markets.
+10. `data/markets/IN.db` migrates to `IN-STOCK.db` without data loss.
+
+---
+
+## 8. Plan
+
+### Phase 1 — Foundation (no UI change)
+- `assets.ts`: the four asset-class definitions with their capabilities
+- `resolve.ts`: symbol → class + market, with tests over 40+ real symbols
+- Storage key becomes `<market>-<class>`; migration of existing files
+- **Gate:** resolution and migration suites pass
+
+### Phase 2 — Instrument-first switching
+- `POST /api/focus` and the console flow that follows it
+- Command palette searches all four classes
+- Asset switcher control
+- **Gate:** switching a stock → ETF → stock leaves no residue
+
+### Phase 3 — ETFs
+- ETF schema: issuer, expense, AUM, holdings, tracking
+- Analysis: cost, concentration, overlap, exposure
+- **Gate:** a real ETF shows real holdings
+
+### Phase 4 — Forex
+- Pair schema, carry from rate differentials, session overlap
+- **Gate:** EURUSD shows a rate, a carry direction and correct session state
+
+### Phase 5 — Crypto
+- Asset schema, supply, liquidity
+- 24/7 session handling
+- **Gate:** BTC shows price, supply and volatility; session reads "always open"
+
+### Phase 6 — Isolation proofs extended
+- Static guard, browser test, purity test all cover asset classes
+- **Gate:** all four proofs green
+
+---
+
+## 9. Data sources
+
+| Class | Free sources | Status |
 |---|---|---|
-| A1 | `ROE > 15` returns only companies with ROE > 15 | `data.test.ts` |
-| A2 | Injection strings are rejected and the table survives | `expr.test.ts`, `data.test.ts` |
-| A3 | "zero debt, ROE above 20" compiles to the right expression | `nl.test.ts` |
-| A4 | Every annual statement balances | `data.test.ts` |
-| A5 | A pledged company is flagged | `data.test.ts` |
-| A6 | All seven company tabs render | `verify.ts` (18 checks) |
-| A7 | Demo data is labelled in the UI | `verify.ts` |
+| Stocks | Yahoo, bundled universe, 158 catalogued | working |
+| ETFs | Yahoo, bundled universe, issuer pages | reachable |
+| Forex | Yahoo (`EURUSD=X`), World Bank rate differentials | reachable |
+| Crypto | Yahoo (`BTC-USD`), CoinGecko (blocked here) | Yahoo reachable |
 
-## 8. Roadmap
+The failover engine already handles a source being down; each class registers its own
+sources rather than assuming one.
 
-1. **v1 (shipped)** — schema, demo pack, expression engine, NL rules, analysis, UI, API.
-2. **v1.1** — live EDGAR ingestion for US filers; a real NSE/BSE adapter where allowed.
-3. **v1.2** — saved screens and watchlists; alerts computed locally.
-4. **v2** — DuckDB backend for factor scans across every company-year; Tauri shell for
-   a native desktop binary.
+---
+
+## 10. Risks and how they are handled
+
+| Risk | Handling |
+|---|---|
+| Scope explosion — four analysis engines | Phase 3–5 each ship one class; nothing is half-built |
+| Cross-class contamination | Physical separation, four proofs, not a filter |
+| Crypto volatility misread as a bug | Volatility thresholds are per-class, not global |
+| Forex needs sessions that never close | Session model gains a `continuous` phase |
+| Migration loses data | Old file kept until the new one verifies |
+| Analysis depth dilutes | Stocks stay the deepest; other classes get their own correct analysis, not a stripped copy |
+
+---
+
+## 11. What is explicitly out of scope
+
+- Options, futures, bonds, commodities — a later decision, not this PRD
+- Multi-user accounts, cloud sync — Atlas stays local-first
+- Broker execution — Atlas analyses, it does not trade
+- Real-time streaming for every class — polling cadence differs per class and is stated
+
+---
+
+## 12. Open questions for the reviewer
+
+1. **Should crypto and forex be market-scoped at all?** They are global, not per-country.
+   The proposal gives them `GLOBAL` and `FX` as pseudo-markets so the same isolation model
+   applies unchanged. Is that the right call, or should they bypass market switching?
+2. **Which ETF and crypto sources do you want prioritised?** Yahoo covers both; dedicated
+   providers are blocked from this network.
+3. **Should the asset switcher hide other classes or show them greyed?** Hiding is cleaner;
+   greying teaches the user what exists.
