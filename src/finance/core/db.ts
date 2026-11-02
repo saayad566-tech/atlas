@@ -259,13 +259,81 @@ export interface Db {
   file: string;
 }
 
+/**
+ * Open a database with settings chosen for a single-user device that still has to survive
+ * a concurrent writer (a background sync while the UI reads).
+ *
+ * - WAL lets readers continue while a write is in flight.
+ * - busy_timeout makes a second writer WAIT rather than fail with SQLITE_BUSY.
+ * - synchronous=NORMAL is the right trade in WAL: durable across app crashes, and the
+ *   database cannot be corrupted by an OS crash, only lose the last transaction.
+ * - A negative cache_size is kibibytes, so -16000 is ~16 MB of page cache.
+ */
+/**
+ * Indexes that keep the common reads fast. Each one exists for a specific query shape the
+ * app actually runs, not speculatively.
+ */
+const PERF_INDEXES: Array<{ table: string; sql: string }> = [
+  { table: 'companies', sql: 'CREATE INDEX IF NOT EXISTS idx_companies_symbol ON companies(symbol)' },
+  { table: 'companies', sql: 'CREATE INDEX IF NOT EXISTS idx_companies_sector ON companies(sector)' },
+  { table: 'price_history', sql: 'CREATE INDEX IF NOT EXISTS idx_price_company_date ON price_history(company_id, date)' },
+  { table: 'price_history', sql: 'CREATE INDEX IF NOT EXISTS idx_price_date ON price_history(date)' },
+  { table: 'statements', sql: 'CREATE INDEX IF NOT EXISTS idx_stmt_company_period ON statements(company_id, period_end)' },
+  { table: 'ratios', sql: 'CREATE INDEX IF NOT EXISTS idx_ratios_company ON ratios(company_id)' },
+  { table: 'universe_symbols', sql: 'CREATE INDEX IF NOT EXISTS idx_universe_market_sector ON universe_symbols(market, sector)' },
+  { table: 'universe_symbols', sql: 'CREATE INDEX IF NOT EXISTS idx_universe_symbol ON universe_symbols(symbol)' },
+];
+
+/** Create only the indexes whose table exists yet; the rest are made on first use. */
+function applyPerfIndexes(db: Database.Database): void {
+  const present = new Set(
+    (db.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all() as Array<{ name: string }>).map((r) => r.name),
+  );
+  for (const ix of PERF_INDEXES) {
+    if (!present.has(ix.table)) continue;
+    try { db.exec(ix.sql); } catch { /* an index is an optimisation, never a blocker */ }
+  }
+}
+
 export function openDatabase(file: string): Db {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new Database(file);
   db.pragma('journal_mode = WAL');
+  db.pragma('busy_timeout = 5000');
+  db.pragma('synchronous = NORMAL');
+  db.pragma('cache_size = -16000');
+  db.pragma('temp_store = MEMORY');
+  db.pragma('foreign_keys = ON');
+  try { db.pragma('mmap_size = 134217728'); } catch { /* not supported everywhere */ }
   db.exec(DDL);
+  applyPerfIndexes(db);
   db.prepare(`INSERT INTO meta(key,value) VALUES('schema_version',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).run(String(SCHEMA_VERSION));
   return { db, file };
+}
+
+/**
+ * Run a write, retrying when SQLite reports the database is busy.
+ *
+ * Two writers can legitimately collide — a background sync and a user action. Rather than
+ * surface SQLITE_BUSY to the user, wait briefly and try again, with backoff, and give up
+ * only after the budget is spent so a stuck writer cannot hang the app forever.
+ */
+export function withWriteRetry<T>(fn: () => T, attempts = 6, baseDelayMs = 25): T {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try { return fn(); }
+    catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const busy = /SQLITE_BUSY|SQLITE_LOCKED|database is locked/i.test(msg);
+      lastErr = e;
+      if (!busy) throw e;
+      const wait = baseDelayMs * Math.pow(2, i) + Math.floor(Math.random() * 15);
+      const until = Date.now() + wait;
+      // A deliberate short spin: this is the retry budget, not a background job.
+      while (Date.now() < until) { /* wait out the backoff */ }
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 export function getMeta(db: Database.Database, key: string): string | null {

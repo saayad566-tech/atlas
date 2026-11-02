@@ -66,6 +66,9 @@ import { bundledMarkets, searchUniverse, universeStats, importInto } from '../co
 import { resolve, resolveOrExplain, storageKey } from '../core/resolve';
 import { countryMarkets } from '../core/markets';
 import { analyseInstrument } from '../core/instrument';
+import { perf } from '../core/perf';
+import { SyncEngine } from '../core/sync';
+import { Tenants, type Scope } from '../core/tenants';
 import { ASSETS, assetDef, type AssetClass } from '../core/assets';
 import type { Bar as AlphaBar } from '../core/alpha';
 import { listStrategies, saveStrategy, deleteStrategy, recordStrategyResult, compileConditions } from '../core/strategy';
@@ -117,6 +120,13 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
   let store = new Store(db.db);
   let flow = new Workflow(db.db);
   let custom = new Custom(db.db);
+  // Background sync and tenant access live beside the market manager, on the same file.
+  const sync = new SyncEngine(initialDb.db, async (kind, target) => {
+    // A job refreshes one target from a network source. Offline, it reports failure so the
+    // engine schedules a retry rather than pretending the data is fresh.
+    return { ok: false, detail: `${kind}:${target} — no reachable source; queued for retry` };
+  });
+  const tenants = new Tenants(initialDb.db);
   const llm = new LocalLlm();
   const aiStore = new AiStore(dataDir ?? path.join(process.cwd(), 'data'));
   const models = new ModelStore(dataDir ?? path.join(process.cwd(), 'data'));
@@ -323,6 +333,20 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
     }
 
     // ---- setup gate: no market chosen yet ----
+    // Measure every response. Wrapping res.end once is cheaper than timing each route.
+    const perfStarted = process.hrtime.bigint();
+    const originalEnd = res.end.bind(res);
+    let recorded = false;
+    (res as unknown as { end: (...a: unknown[]) => unknown }).end = (...args: unknown[]) => {
+      if (!recorded) {
+        recorded = true;
+        const ms = Number(process.hrtime.bigint() - perfStarted) / 1e6;
+        const len = typeof args[0] === 'string' ? Buffer.byteLength(args[0]) : 0;
+        try { perf.record(p, ms, len, res.statusCode); } catch { /* metrics never break a request */ }
+      }
+      return (originalEnd as (...a: unknown[]) => unknown)(...args);
+    };
+
     const setupExempt = p === '/api/health' || p === '/api/markets' || p.startsWith('/api/auth/') || p.startsWith('/api/setup') || p === '/api/seed' || !p.startsWith('/api/');
     if (!markets.configured() && !setupExempt) {
       res.writeHead(428, { 'Content-Type': 'application/json' });
@@ -1487,6 +1511,49 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       // ---- newsroom: per-country market news, cached for offline reading ----
       // ---- trading sessions ----
       // ---- alpha factors: statistical features from stored prices ----
+      // ---- performance: latency, throughput, alerts ----
+      if (p === '/api/perf') return json(res, 200, perf.snapshot());
+      if (p === '/api/perf/thresholds' && req.method === 'POST') {
+        const b = (await readBody(req)) as Partial<{ latencyWarnMs: number; latencyAlertMs: number; errorRatePct: number; minSamples: number }>;
+        return json(res, 200, { thresholds: perf.setThresholds(b) });
+      }
+      if (p === '/api/perf/alerts/clear' && req.method === 'POST') { perf.clearAlerts(); return json(res, 200, { ok: true }); }
+
+      // ---- background sync: queue, drain, retry, history ----
+      if (p === '/api/sync/status') return json(res, 200, sync.status());
+      if (p === '/api/sync/run' && req.method === 'POST') return json(res, 200, await sync.drain(10));
+      if (p === '/api/sync/retry' && req.method === 'POST') return json(res, 200, { requeued: sync.retryFailed() });
+      if (p === '/api/sync/enqueue' && req.method === 'POST') {
+        const b = (await readBody(req)) as { kind?: string; target?: string };
+        if (!b.kind || !b.target) return json(res, 400, { error: 'Provide kind and target' });
+        return json(res, 200, sync.enqueue(String(b.kind), String(b.target)));
+      }
+
+      // ---- tenants and scoped API keys ----
+      if (p === '/api/tenants' && req.method === 'GET') return json(res, 200, { tenants: tenants.list() });
+      if (p === '/api/tenants' && req.method === 'POST') {
+        const b = (await readBody(req)) as { name?: string };
+        if (!b.name || !b.name.trim()) return json(res, 400, { error: 'Provide a tenant name' });
+        const t = tenants.create(b.name.trim(), path.join(dataDir ?? path.join(process.cwd(), 'data'), 'tenants', b.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')));
+        return json(res, 200, t);
+      }
+      if (p.startsWith('/api/tenants/') && p.endsWith('/keys') && req.method === 'GET') {
+        const id = decodeURIComponent(p.slice('/api/tenants/'.length, -'/keys'.length));
+        return json(res, 200, { keys: tenants.listKeys(id) });
+      }
+      if (p.startsWith('/api/tenants/') && p.endsWith('/keys') && req.method === 'POST') {
+        const id = decodeURIComponent(p.slice('/api/tenants/'.length, -'/keys'.length));
+        const b = (await readBody(req)) as { label?: string; scopes?: Scope[] };
+        try {
+          const k = tenants.issueKey(id, String(b.label ?? 'default'), Array.isArray(b.scopes) && b.scopes.length ? b.scopes : ['read']);
+          return json(res, 200, { ...k, note: 'This key is shown once. It is stored only as a hash.' });
+        } catch (e) { return json(res, 404, { error: e instanceof Error ? e.message : 'Unknown tenant' }); }
+      }
+      if (p.startsWith('/api/keys/') && req.method === 'DELETE') {
+        const id = Number(p.slice('/api/keys/'.length));
+        return json(res, 200, { revoked: tenants.revoke(id) });
+      }
+
       // ---- analysis for a non-stock instrument ----
       if (p.startsWith('/api/instrument/')) {
         const sym = decodeURIComponent(p.slice('/api/instrument/'.length));
