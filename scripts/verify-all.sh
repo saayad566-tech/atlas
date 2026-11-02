@@ -74,6 +74,7 @@ run listings  verify-listings.js
 run data-q    verify-data-quality.js
 run nulls     verify-null-pipeline.js
 run robust    verify-robustness.js
+run shapes    verify-shapes.js
 run provenance verify-provenance.js
 run failover  verify-failover.js
 run adapters  verify-adapters.js

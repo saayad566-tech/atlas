@@ -55,7 +55,11 @@ let fails=0; const ok=(n,c,d)=>{ if(!c) fails++; console.log(`  ${c?'PASS':'FAIL
   await pg.goto(`http://127.0.0.1:${atlas.server.address().port}`,{waitUntil:'networkidle'});
   await pg.waitForFunction(()=>document.querySelectorAll('#result-body tr').length>2);
   await pg.locator('#result-body tr').first().click(); await pg.waitForTimeout(3500);
-  ok('the table renders rows', (await pg.locator('#bd-rows tr').count())>10, `${await pg.locator('#bd-rows tr').count()} rows`);
+  // Wait for the panel to fill before counting: the fetch is async and the assertion used
+  // to run a moment before the rows existed.
+  await pg.waitForFunction(()=>document.querySelectorAll('#bd-rows tr').length>10,{timeout:15000}).catch(()=>{});
+  const bdRows=await pg.locator('#bd-rows tr').count();
+  ok('the table renders rows', bdRows>10, `${bdRows} rows`);
   ok('the stat cards render', (await pg.locator('#bd-stats .scorecard').count())===6, `${await pg.locator('#bd-stats .scorecard').count()} cards`);
   await pg.selectOption('#bd-interval','month'); await pg.click('#bd-go'); await pg.waitForTimeout(1500);
   ok('switching interval re-renders', (await pg.locator('#bd-rows tr').count())>0 && (await pg.locator('#bd-rows tr').count())<50, `${await pg.locator('#bd-rows tr').count()} monthly rows`);
