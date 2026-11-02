@@ -39,16 +39,89 @@ async function unlock() {
   } catch (e) { $('#lock-msg').textContent = e.message; }
 }
 
+// ---- resilient fetch -------------------------------------------------------
+// One wrapper gives every call the same behaviour: a timeout so nothing hangs, retries
+// with backoff for transient failures, no retry for client errors, and a visible banner
+// with a Retry button when the device is offline.
+const RETRY_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+const TIMEOUT_MS = 15000;
+let offlineShown = false;
+
+function showNetBanner(message, retry) {
+  const el = $('#net-banner');
+  if (!el) return;
+  el.hidden = false;
+  const msg = $('#net-msg'); if (msg) msg.textContent = message;
+  const btn = $('#net-retry');
+  if (btn) { btn.hidden = !retry; btn.onclick = retry ? () => { el.hidden = true; retry(); } : null; }
+}
+
+function hideNetBanner() {
+  const el = $('#net-banner');
+  if (el) el.hidden = true;
+  offlineShown = false;
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function api(path, opts) {
   const tok = authToken();
   const headers = { 'Content-Type': 'application/json', ...(tok ? { authorization: `Bearer ${tok}` } : {}), ...(opts && opts.headers ? opts.headers : {}) };
-  const res = await fetch(FIN + path, { ...(opts || {}), headers });
-  if (res.status === 401) { showLock('Enter your PIN to continue.'); throw new Error('Locked'); }
-  if (res.status === 428) { $('#setup').hidden = false; throw new Error('Choose a market to begin'); }
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-  return body;
+  const maxAttempts = 3;
+  let lastErr = null;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(FIN + path, { ...(opts || {}), headers, signal: ctrl.signal });
+      clearTimeout(timer);
+
+      if (res.status === 401) { showLock('Enter your PIN to continue.'); throw new Error('Locked'); }
+      if (res.status === 428) { $('#setup').hidden = false; throw new Error('Choose a market to begin'); }
+
+      const body = await res.json().catch(() => ({}));
+
+      // Client errors are the caller's problem — retrying cannot help.
+      if (res.status >= 400 && res.status < 500 && !RETRY_STATUS.has(res.status)) {
+        hideNetBanner();
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      if (!res.ok) {
+        lastErr = new Error(body.error || `HTTP ${res.status}`);
+        if (attempt < maxAttempts - 1) { await sleep(300 * 2 ** attempt); continue; }
+        throw lastErr;
+      }
+      hideNetBanner();
+      return body;
+    } catch (e) {
+      clearTimeout(timer);
+      if (e && e.message === 'Locked') throw e;
+      const aborted = e && e.name === 'AbortError';
+      const network = aborted || (e instanceof TypeError);
+      lastErr = new Error(aborted ? `Timed out after ${TIMEOUT_MS / 1000}s` : (e && e.message) || 'Network error');
+      if (attempt < maxAttempts - 1) { await sleep(300 * 2 ** attempt); continue; }
+      if (network || !navigator.onLine) {
+        showNetBanner(aborted ? 'The server did not respond. Retry when ready.' : 'Connection lost — showing stored data.', () => reloadCurrentView());
+        offlineShown = true;
+      }
+      throw lastErr;
+    }
+  }
+  throw lastErr || new Error('Request failed');
 }
+
+/** Re-run whatever the user is currently looking at, after a failure or a reconnect. */
+function reloadCurrentView() {
+  const active = document.querySelector('.view.active');
+  const id = active ? active.id : 'view-screener';
+  if (id === 'view-screener' && typeof runScreen === 'function') { runScreen({ expression: (state && state.expression) || 'Market Cap > 0' }); return; }
+  if (typeof showView === 'function') { const v = (id || '').replace('view-', ''); if (v) showView(v); }
+}
+
+// Recover automatically when the device comes back online.
+window.addEventListener('online', () => { hideNetBanner(); toast('Back online — refreshing'); reloadCurrentView(); });
+window.addEventListener('offline', () => { showNetBanner('You are offline. Stored data stays available.'); });
 
 
 const cr = (v) => (v === null || v === undefined ? '—' : nf.format(v));
