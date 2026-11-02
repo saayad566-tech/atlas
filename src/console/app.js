@@ -1711,6 +1711,25 @@ async function loadAsk(symbol) {
 // ---- morning briefing -------------------------------------------------------
 
 
+
+async function loadNewsroom() {
+  const el = $('#newsroom-panel');
+  if (!el) return;
+  try {
+    const r = await api(`/api/newsroom?market=${encodeURIComponent(state.market || 'IN')}&limit=8`);
+    const when = (d) => { const t = new Date(d); return Number.isNaN(t.getTime()) ? '' : t.toLocaleString(); };
+    el.innerHTML = r.items.length
+      ? r.items.map((n) => `<div class="scorecard"><div class="t">${esc(n.title.slice(0, 90))}</div>
+          <div class="d hint">${esc(n.publisher || n.source)} · ${esc(when(n.publishedAt))}</div>
+          ${n.url ? `<div class="d"><a href="${esc(n.url)}" target="_blank" rel="noopener noreferrer">Open</a></div>` : ''}</div>`).join('')
+      : `<div class="scorecard"><div class="t">NO HEADLINES</div><div class="d hint">${esc(r.note || 'No source answered.')}</div></div>`;
+    el.insertAdjacentHTML('beforeend', `<div class="scorecard"><div class="t">SOURCES</div>
+      <div class="d hint">${esc(r.sources.join(', ') || 'none')} · ${r.fromCache ? 'cached' : 'fresh'} · as of ${esc(when(r.fetchedAt))}</div></div>`);
+  } catch (e) {
+    el.innerHTML = `<div class="scorecard"><div class="t">NEWSROOM</div><div class="d hint">${esc(e.message)}</div></div>`;
+  }
+}
+
 async function loadAdvisors() {
   const el = $('#advisors-panel');
   if (!el) return;
@@ -2555,7 +2574,7 @@ function wire() {
       if (v === 'rank') loadRank();
       if (v === 'portfolio') { loadPortfolio(); loadPortfolioPnl(); }
       if (v === 'import') loadImport();
-      if (v === 'intel') { loadIntel(); loadJobs(); loadTools(); loadAdmin(); loadUniverse(); loadMovers(); loadSectorBreadth();  loadSectors(); loadDiscover(); loadAdvisors(); }
+      if (v === 'intel') { loadIntel(); loadJobs(); loadTools(); loadAdmin(); loadUniverse(); loadMovers(); loadSectorBreadth();  loadSectors(); loadDiscover(); loadAdvisors(); loadNewsroom(); }
       if (v === 'store') { loadStore(); loadModels(); }
       if (v === 'macro') loadMacro();
     };

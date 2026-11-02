@@ -58,6 +58,7 @@ run advisors  verify-advisors.js
 run backdata  verify-backdata.js
 run timestamps verify-timestamps.js
 run resilient verify-resilience.js
+run newsroom  verify-newsroom.js
 run provenance verify-provenance.js
 run failover  verify-failover.js
 run adapters  verify-adapters.js

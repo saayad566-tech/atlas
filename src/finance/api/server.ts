@@ -59,6 +59,7 @@ import { companyGraph, storylines } from '../core/graph';
 import { ask } from '../core/ask';
 import { ADVISORS, advisorsFor, findAdvisor, runMethod, libraryCoverage, methodExpression } from '../core/advisors';
 import { priceHistory, dataCoverage, type Interval } from '../core/pricehistory';
+import { marketNews, persistNews, storedNews, newsCoverage } from '../core/newsroom';
 import { listStrategies, saveStrategy, deleteStrategy, recordStrategyResult, compileConditions } from '../core/strategy';
 import { registrySummary, sourcesFor, SOURCE_REGISTRY } from '../core/sourceRegistry';
 import { SourcePool, runWithFailover } from '../core/failover';
@@ -1442,6 +1443,22 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       // ---- ask: answer a question from stored data ----
       // ---- investor library: documented methods, runnable as screens ----
       // ---- back data: browse any stored date range ----
+      // ---- newsroom: per-country market news, cached for offline reading ----
+      if (p === '/api/newsroom/coverage') {
+        return json(res, 200, { markets: newsCoverage() });
+      }
+      if (p === '/api/newsroom') {
+        const code = url.searchParams.get('market') ?? markets.active() ?? 'IN';
+        const limit = Math.min(Math.max(Number(url.searchParams.get('limit') ?? 20), 1), 60);
+        const r = await marketNews(code, limit);
+        if (!r) return json(res, 404, { error: `No newsroom configured for ${code}` });
+        if (r.items.length) persistNews(db.db, code, r.items);
+        return json(res, 200, r);
+      }
+      if (p === '/api/newsroom/stored') {
+        const code = url.searchParams.get('market') ?? markets.active() ?? 'IN';
+        return json(res, 200, { market: code, items: storedNews(db.db, code, Number(url.searchParams.get('limit') ?? 20)) });
+      }
       if (p === '/api/prices/coverage') {
         return json(res, 200, dataCoverage(db.db));
       }
