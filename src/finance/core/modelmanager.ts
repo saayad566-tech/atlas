@@ -12,6 +12,10 @@ export interface DeviceProfile {
 }
 
 export interface ModelVariant {
+  /** What this model is, in plain words. */
+  description?: string;
+  /** What it is good at, so a user can choose. */
+  bestFor?: string;
   id: string; name: string; family: string; params: string; quant: 'Q4_K_M' | 'Q5_K_M' | 'Q8_0' | 'fp16';
   sizeMb: number; ramNeededMb: number; licence: string; source: string; sha256?: string;
   quality: 1 | 2 | 3 | 4 | 5; speed: 1 | 2 | 3 | 4 | 5;
@@ -19,12 +23,16 @@ export interface ModelVariant {
 
 /** A small, honest catalogue — every entry is a real published model. */
 export const MODEL_CATALOGUE: ModelVariant[] = [
-  { id: 'qwen2.5-0.5b-q4', name: 'Qwen2.5 0.5B Instruct Q4_K_M', family: 'Qwen2.5', params: '0.5B', quant: 'Q4_K_M', sizeMb: 398, ramNeededMb: 700, licence: 'Apache-2.0', source: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF', quality: 2, speed: 5 },
-  { id: 'qwen2.5-1.5b-q4', name: 'Qwen2.5 1.5B Instruct Q4_K_M', family: 'Qwen2.5', params: '1.5B', quant: 'Q4_K_M', sizeMb: 1024, ramNeededMb: 1600, licence: 'Apache-2.0', source: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF', quality: 3, speed: 4 },
-  { id: 'qwen2.5-3b-q4', name: 'Qwen2.5 3B Instruct Q4_K_M', family: 'Qwen2.5', params: '3B', quant: 'Q4_K_M', sizeMb: 1900, ramNeededMb: 2800, licence: 'Qwen licence', source: 'https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF', quality: 4, speed: 3 },
-  { id: 'llama3.2-1b-q4', name: 'Llama 3.2 1B Instruct Q4_K_M', family: 'Llama 3.2', params: '1B', quant: 'Q4_K_M', sizeMb: 808, ramNeededMb: 1300, licence: 'Llama 3.2 Community', source: 'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF', quality: 3, speed: 4 },
-  { id: 'llama3.2-1b-q8', name: 'Llama 3.2 1B Instruct Q8_0', family: 'Llama 3.2', params: '1B', quant: 'Q8_0', sizeMb: 1320, ramNeededMb: 1900, licence: 'Llama 3.2 Community', source: 'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF', quality: 3, speed: 3 },
-  { id: 'qwen2.5-7b-q4', name: 'Qwen2.5 7B Instruct Q4_K_M', family: 'Qwen2.5', params: '7B', quant: 'Q4_K_M', sizeMb: 4680, ramNeededMb: 6400, licence: 'Qwen licence', source: 'https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF', quality: 5, speed: 2 },
+  { id: 'qwen2.5-0.5b-q4', name: 'Qwen2.5 0.5B Instruct Q4_K_M', family: 'Qwen2.5', params: '0.5B', quant: 'Q4_K_M', sizeMb: 398, ramNeededMb: 700, licence: 'Apache-2.0', source: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF', quality: 2, speed: 5, description: 'Smallest Qwen. Runs on almost any phone.', bestFor: 'quick factual answers and short summaries' },
+  { id: 'qwen2.5-1.5b-q4', name: 'Qwen2.5 1.5B Instruct Q4_K_M', family: 'Qwen2.5', params: '1.5B', quant: 'Q4_K_M', sizeMb: 1024, ramNeededMb: 1600, licence: 'Apache-2.0', source: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF', quality: 3, speed: 4, description: 'Balanced Qwen. The default choice for most devices.', bestFor: 'company analysis, screening questions and general chat' },
+  { id: 'qwen2.5-3b-q4', name: 'Qwen2.5 3B Instruct Q4_K_M', family: 'Qwen2.5', params: '3B', quant: 'Q4_K_M', sizeMb: 1900, ramNeededMb: 2800, licence: 'Qwen licence', source: 'https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF', quality: 4, speed: 3, description: 'Stronger Qwen. Noticeably better reasoning.', bestFor: 'multi-step questions and longer explanations' },
+  { id: 'llama3.2-1b-q4', name: 'Llama 3.2 1B Instruct Q4_K_M', family: 'Llama 3.2', params: '1B', quant: 'Q4_K_M', sizeMb: 808, ramNeededMb: 1300, licence: 'Llama 3.2 Community', source: 'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF', quality: 3, speed: 4, description: 'The small Llama, compressed.', bestFor: 'everyday questions where speed matters more than depth' },
+  { id: 'llama3.2-1b-q8', name: 'Llama 3.2 1B Instruct Q8_0', family: 'Llama 3.2', params: '1B', quant: 'Q8_0', sizeMb: 1320, ramNeededMb: 1900, licence: 'Llama 3.2 Community', source: 'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF', quality: 3, speed: 3, description: 'The same Llama at higher precision.', bestFor: 'short answers where accuracy matters more than speed' },
+  { id: 'qwen2.5-7b-q4', name: 'Qwen2.5 7B Instruct Q4_K_M', family: 'Qwen2.5', params: '7B', quant: 'Q4_K_M', sizeMb: 4680, ramNeededMb: 6400, licence: 'Qwen licence', source: 'https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF', quality: 5, speed: 2, description: 'Largest Qwen here. Needs a desktop-class device.', bestFor: 'deep reasoning, long documents and careful comparison' },
+  { id: 'gemma2-2b-q4', name: 'Gemma 2 2B Instruct Q4_K_M', family: 'Gemma 2', params: '2B', quant: 'Q4_K_M', sizeMb: 1600, ramNeededMb: 2400, licence: 'Gemma Terms', source: 'https://huggingface.co/bartowski/gemma-2-2b-it-GGUF', quality: 4, speed: 4, description: 'Gemma 2 by Google, small and well-rounded.', bestFor: 'clear explanations and conversational answers' },
+  { id: 'phi3-mini-q4', name: 'Phi-3 Mini 3.8B Q4_K_M', family: 'Phi-3', params: '3.8B', quant: 'Q4_K_M', sizeMb: 2300, ramNeededMb: 3400, licence: 'MIT', source: 'https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf', quality: 4, speed: 3, description: 'Phi-3 by Microsoft, strong at structured reasoning for its size.', bestFor: 'step-by-step analysis and arithmetic' },
+  { id: 'tinyllama-11b-q4', name: 'TinyLlama 1.1B Q4_K_M', family: 'TinyLlama', params: '1.1B', quant: 'Q4_K_M', sizeMb: 670, ramNeededMb: 1100, licence: 'Apache-2.0', source: 'https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF', quality: 2, speed: 5, description: 'Very small and fast, but limited depth.', bestFor: 'short lookups on low-memory devices' },
+  { id: 'mistral-7b-q4', name: 'Mistral 7B Instruct Q4_K_M', family: 'Mistral', params: '7B', quant: 'Q4_K_M', sizeMb: 4400, ramNeededMb: 6200, licence: 'Apache-2.0', source: 'https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF', quality: 5, speed: 2, description: 'Mature 7B model with broad general knowledge.', bestFor: 'questions beyond finance, on a desktop' },
 ];
 
 export function deviceProfile(): DeviceProfile {

@@ -29,8 +29,8 @@ import { Security, errorBody } from '../core/security';
 import { atlasScore, explainMatch } from '../core/intel';
 import { MarketManager, MARKETS, marketDef } from '../core/markets';
 import { LocalLlm, crossCheck } from '../core/llm';
+import { MODEL_CATALOGUE, deviceProfile, recommendModel, ModelStore, detectRuntime, validateGguf, exportConfig, importConfig } from '../core/modelmanager';
 import { AiStore } from '../core/aistore';
-import { ModelStore, MODEL_CATALOGUE, deviceProfile, recommendModel, detectRuntime, validateGguf, exportConfig, importConfig } from '../core/modelmanager';
 import { portfolioPnl, dataFreshness, sectorCompanies, explainScreen, toCsv, bulkWatchlist, newsCount, topMovers, sectorBreadth, companyTimeline, watchlistCalendar } from '../core/userfeatures';
 import { priceSeries, sparklines, sectorBars, sparkSvg } from '../core/chart';
 import { computeIndicators, resample, INDICATORS, type Bar, type IndicatorId } from '../core/indicators';
@@ -1441,6 +1441,22 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       // ---- data truth: what we actually know, and how much to trust it ----
       // ---- graph, storylines, strategy library, condition builder ----
       // ---- assistant: the local model when it is running, grounded rules otherwise ----
+      if (p === '/api/models') {
+        const profile = deviceProfile();
+        const rec = recommendModel(profile);
+        return json(res, 200, {
+          device: profile,
+          recommended: rec.best?.id ?? null,
+          models: MODEL_CATALOGUE.map((m) => ({
+            id: m.id, name: m.name, family: m.family, params: m.params, quant: m.quant,
+            sizeMb: m.sizeMb, ramNeededMb: m.ramNeededMb, licence: m.licence,
+            description: m.description ?? null, bestFor: m.bestFor ?? null,
+            fitsThisDevice: profile.ramMb >= m.ramNeededMb,
+            quality: m.quality, speed: m.speed,
+          })),
+          note: 'Sizes are download size. fitsThisDevice compares the requirement with this device RAM.',
+        });
+      }
       if (p.startsWith('/api/assistant/')) {
         const sym = decodeURIComponent(p.slice('/api/assistant/'.length));
         const q = url.searchParams.get('q') ?? '';
