@@ -99,11 +99,41 @@ function json(res: http.ServerResponse, code: number, body: unknown): void {
   res.end(payload);
 }
 
+/** Thrown when a request body exceeds the limit; the top-level handler turns it into 413. */
+export class BodyTooLargeError extends Error {
+  constructor() { super('Request body too large (limit 1 MB).'); this.name = 'BodyTooLargeError'; }
+}
+const MAX_BODY_BYTES = 1_000_000;
+
+/**
+ * Read and parse a JSON body, bounded.
+ *
+ * The previous version called req.destroy() when the body grew too large, which reset the
+ * connection: the client saw a network failure rather than being told the body was too big,
+ * and the promise never settled. This drains the stream, stops buffering at the limit, and
+ * resolves with a marker the handler turns into a clean 413.
+ */
 function readBody(req: http.IncomingMessage): Promise<unknown> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     let raw = '';
-    req.on('data', (c) => { raw += c; if (raw.length > 1e6) req.destroy(); });
-    req.on('end', () => { try { resolve(raw ? JSON.parse(raw) : {}); } catch { resolve({}); } });
+    let tooLarge = false;
+    let settled = false;
+    const finish = (value: unknown): void => { if (!settled) { settled = true; resolve(value); } };
+    const fail = (e: Error): void => { if (!settled) { settled = true; reject(e); } };
+
+    req.setEncoding('utf8');
+    req.on('data', (chunk: string) => {
+      if (tooLarge) return;                       // keep draining, stop buffering
+      raw += chunk;
+      if (raw.length > MAX_BODY_BYTES) { tooLarge = true; raw = ''; }
+    });
+    req.on('end', () => {
+      if (tooLarge) return fail(new BodyTooLargeError());
+      if (!raw) return finish({});
+      try { finish(JSON.parse(raw)); } catch { finish({}); }
+    });
+    req.on('error', () => { if (tooLarge) fail(new BodyTooLargeError()); else finish({}); });
+    req.on('aborted', () => finish({}));
   });
 }
 
@@ -2024,6 +2054,8 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
 
       json(res, 404, { error: 'Not found' });
     } catch (e) {
+      // A body over the limit is a client error with its own status, not a server fault.
+      if (e instanceof BodyTooLargeError) return json(res, 413, { error: e.message, code: 'BODY_TOO_LARGE' });
       const body = errorBody(e);
       json(res, body.code === 'NOT_FOUND' ? 404 : body.code === 'BAD_REQUEST' ? 400 : 500, body);
     }
