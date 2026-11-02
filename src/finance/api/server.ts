@@ -52,6 +52,7 @@ import { briefCompany, briefMarket } from '../core/briefing';
 import { addEntry, listJournal, closeEntry, journalScorecard } from '../core/journal';
 import { trendingSectors, rankCandidates, peerPercentiles } from '../core/discover';
 import { metricHistory, earningsSurprises } from '../core/history';
+import { loadSeries, backtest } from '../core/backtest';
 import { registrySummary, sourcesFor, SOURCE_REGISTRY } from '../core/sourceRegistry';
 import { SourcePool, runWithFailover } from '../core/failover';
 import { listRatios, saveRatio, deleteRatio, applyRatios, validateFormula, allowedFields, RatioError } from '../core/customRatios';
@@ -464,6 +465,16 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       }
       // ---- peer percentile ranking ----
       // ---- multi-year metric history and trend ----
+      // ---- strategy backtest over stored price history ----
+      if (p === '/api/backtest') {
+        const q = (k: string, d: number): number => Number(url.searchParams.get(k) ?? d);
+        const series = loadSeries(db.db);
+        const r = backtest(series, {
+          lookbackDays: q('lookback', 120), topN: q('top', 10),
+          rebalanceDays: q('rebalance', 21), costPct: q('cost', 0.25),
+        });
+        return json(res, 200, r);
+      }
       if (p.startsWith('/api/history/')) {
         const sym = decodeURIComponent(p.slice('/api/history/'.length));
         const h = metricHistory(db.db, sym);

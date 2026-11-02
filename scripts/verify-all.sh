@@ -49,6 +49,7 @@ run journal   verify-journal.js
 run discover  verify-discover.js
 run peer-rank verify-peer-rank.js
 run history   verify-history.js
+run backtest  verify-backtest.js
 run provenance verify-provenance.js
 run failover  verify-failover.js
 run adapters  verify-adapters.js
