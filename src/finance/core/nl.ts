@@ -187,8 +187,8 @@ export interface LlmOptions { baseUrl?: string; model?: string; timeoutMs?: numb
  * answer is only accepted if it compiles and mentions at least one real field.
  */
 export async function parseQueryWithLlm(text: string, opts: LlmOptions = {}): Promise<NlResult> {
-  const baseUrl = opts.baseUrl ?? process.env['SIFT_OLLAMA_URL'] ?? 'http://127.0.0.1:11434';
-  const model = opts.model ?? process.env['SIFT_OLLAMA_MODEL'] ?? 'llama3.2';
+  const baseUrl = opts.baseUrl ?? process.env['ATLAS_OLLAMA_URL'] ?? 'http://127.0.0.1:11434';
+  const model = opts.model ?? process.env['ATLAS_OLLAMA_MODEL'] ?? 'qwen2.5:1.5b-instruct-q4_K_M';
   const fetchImpl = opts.fetchImpl ?? fetch;
   const fallback = (note: string): NlResult => { const r = parseQuery(text); r.notes.unshift(note); return r; };
 

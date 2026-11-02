@@ -55,6 +55,9 @@ import { metricHistory, earningsSurprises } from '../core/history';
 import { loadSeries, backtest } from '../core/backtest';
 import { corporateTimeline, insiderFlows } from '../core/corporate';
 import { companyTruth, marketTruth } from '../core/datatruth';
+import { companyGraph, storylines } from '../core/graph';
+import { ask } from '../core/ask';
+import { listStrategies, saveStrategy, deleteStrategy, recordStrategyResult, compileConditions } from '../core/strategy';
 import { registrySummary, sourcesFor, SOURCE_REGISTRY } from '../core/sourceRegistry';
 import { SourcePool, runWithFailover } from '../core/failover';
 import { listRatios, saveRatio, deleteRatio, applyRatios, validateFormula, allowedFields, RatioError } from '../core/customRatios';
@@ -1427,6 +1430,78 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
                      : json(res, 404, { error: 'No such company' });
       }
       // ---- data truth: what we actually know, and how much to trust it ----
+      // ---- graph, storylines, strategy library, condition builder ----
+      // ---- ask: answer a question from stored data ----
+      if (p.startsWith('/api/ask/')) {
+        const sym = decodeURIComponent(p.slice('/api/ask/'.length));
+        const q = url.searchParams.get('q') ?? '';
+        if (!q.trim()) return json(res, 400, { error: 'Provide a question with ?q=' });
+        const a = ask(db.db, sym, q);
+        return a ? json(res, 200, a) : json(res, 404, { error: 'No such company in this market' });
+      }
+      // ---- held review: look at what you own with fresh eyes ----
+      if (p === '/api/held-review') {
+        const rows = db.db.prepare(`
+          SELECT c.symbol, c.name, p.quantity, p.avg_cost, COALESCE(q.price,0) AS price
+          FROM portfolio p JOIN companies c ON c.id=p.company_id LEFT JOIN quotes q ON q.company_id=c.id`).all() as Array<{ symbol: string; name: string; quantity: number; avg_cost: number; price: number }>;
+        const items = rows.map((h) => {
+          const b = briefCompany(db.db, h.symbol, markets.active() ?? 'IN');
+          const pnlPct = h.avg_cost > 0 ? Math.round(((h.price - h.avg_cost) / h.avg_cost) * 1000) / 10 : null;
+          const flags = b ? b.dissent.filter((d) => d.severity === 'flag') : [];
+          return {
+            symbol: h.symbol, name: h.name, quantity: h.quantity,
+            avgCost: h.avg_cost, price: h.price, pnlPct,
+            verdict: b?.headline ?? 'no analysis available',
+            stances: b?.stances ?? [],
+            review: flags.length ? `Re-examine: ${flags[0]!.message}` : (b ? `Holding up — ${b.confidence.level} confidence.` : 'No data to review.'),
+            needsAttention: flags.length > 0 || (pnlPct !== null && pnlPct < -20),
+          };
+        });
+        return json(res, 200, {
+          holdings: items.length,
+          needsAttention: items.filter((i) => i.needsAttention).length,
+          items,
+          note: 'Each holding is re-read from its current numbers. A position is flagged when its dimensions contradict or it is down more than 20%.',
+        });
+      }
+      if (p.startsWith('/api/graph/')) {
+        const g = companyGraph(db.db, decodeURIComponent(p.slice('/api/graph/'.length)));
+        return g ? json(res, 200, g) : json(res, 404, { error: 'No such company in this market' });
+      }
+      if (p.startsWith('/api/storylines/')) {
+        const st = storylines(db.db, decodeURIComponent(p.slice('/api/storylines/'.length)));
+        return st ? json(res, 200, st) : json(res, 404, { error: 'No such company in this market' });
+      }
+      if (p === '/api/strategies' && req.method === 'GET') {
+        return json(res, 200, { market: markets.active() ?? 'IN', strategies: listStrategies(db.db, markets.active() ?? 'IN') });
+      }
+      if (p === '/api/strategies' && req.method === 'POST') {
+        const b = (await readBody(req)) as { name?: string; lookbackDays?: number; topN?: number; rebalanceDays?: number; costPct?: number; note?: string };
+        try {
+          const id = saveStrategy(db.db, {
+            name: String(b.name ?? ''), market: markets.active() ?? 'IN',
+            lookbackDays: Number(b.lookbackDays ?? 120), topN: Number(b.topN ?? 10),
+            rebalanceDays: Number(b.rebalanceDays ?? 21), costPct: Number(b.costPct ?? 0.25), note: b.note,
+          });
+          return json(res, 200, { ok: true, id });
+        } catch (e) { return json(res, 400, { error: e instanceof Error ? e.message : 'Could not save' }); }
+      }
+      if (p.startsWith('/api/strategies/run/') && req.method === 'POST') {
+        const id = Number(decodeURIComponent(p.slice('/api/strategies/run/'.length)));
+        const st = listStrategies(db.db, markets.active() ?? 'IN').find((x) => x.id === id);
+        if (!st) return json(res, 404, { error: 'No strategy with that id in this market' });
+        const r = backtest(loadSeries(db.db), { lookbackDays: st.lookbackDays, topN: st.topN, rebalanceDays: st.rebalanceDays, costPct: st.costPct });
+        if (r.ok) recordStrategyResult(db.db, id, r.stats.totalReturnPct, r.stats.benchmarkReturnPct);
+        return json(res, 200, { strategy: st, result: r });
+      }
+      if (p.startsWith('/api/strategies/') && req.method === 'DELETE') {
+        const id = Number(decodeURIComponent(p.slice('/api/strategies/'.length)));
+        return json(res, deleteStrategy(db.db, id) ? 200 : 404, { ok: true });
+      }
+      if (p === '/api/conditions/compile' && req.method === 'POST') {
+        const b = (await readBody(req)) as { conditions?: Array<{ field: string; op: never; value: number }>; join?: 'AND' | 'OR' };
+        return json(res, 200, compileConditions(Array.isArray(b.conditions) ? b.conditions : [], b.join ?? 'AND'));
+      }
       if (p === '/api/data-truth') {
         return json(res, 200, marketTruth(db.db, markets.active() ?? 'IN'));
       }
@@ -1643,7 +1718,7 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
   });
 }
 
-// The standalone CLI entry was removed: it opened data/sift.db directly, which is a
+// The standalone CLI entry was removed: it opened a database file directly, which is a
 // DIFFERENT database from the per-market files and would have served another country's
 // data. The gateway (dist/gateway.js) is the only entry point and always goes through
 // the market manager.

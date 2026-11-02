@@ -392,6 +392,8 @@ function renderCompany() {
   loadHistory(co.symbol);
   loadCorporate(co.symbol);
   loadDataTruth(co.symbol);
+  loadGraph(co.symbol);
+  if ($('#ask-go')) { $('#ask-go').onclick = () => askCompany(co.symbol); $('#ask-input').onkeydown = (e) => { if (e.key === 'Enter') askCompany(co.symbol); }; }
   loadNote(co.symbol);
   researchPrompt(co.symbol);
   $('#btn-research').onclick = () => loadResearch(co.symbol);
@@ -1667,6 +1669,48 @@ async function loadMarketBriefing() {
 
 
 
+
+
+
+async function askCompany(symbol) {
+  const input = $('#ask-input'); const out = $('#ask-answer');
+  if (!input || !out) return;
+  const q = input.value.trim();
+  if (!q) { out.textContent = 'Type a question first.'; return; }
+  out.textContent = 'Reading the numbers…';
+  try {
+    const r = await api(`/api/ask/${encodeURIComponent(symbol)}?q=${encodeURIComponent(q)}`);
+    out.innerHTML = `<div class="d"><b>${esc(r.answer)}</b></div>
+      <div class="d hint">${r.evidence.map((e) => `${esc(e.label)}: ${esc(e.value)}`).join(' · ')}</div>
+      <div class="d hint">Confidence: ${esc(r.confidence)}${r.caveat ? ' — ' + esc(r.caveat) : ''}</div>`;
+  } catch (e) { out.textContent = e.message; }
+}
+
+async function loadGraph(symbol) {
+  const gEl = $('#co-graph'); const sEl = $('#co-storylines');
+  if (gEl) {
+    try {
+      const g = await api(`/api/graph/${encodeURIComponent(symbol)}`);
+      const kinds = ['segment', 'geography', 'subsidiary', 'product', 'risk'];
+      gEl.innerHTML = kinds.filter((k) => g.nodes.some((n) => n.kind === k)).map((k) => {
+        const items = g.nodes.filter((n) => n.kind === k);
+        return `<div class="scorecard"><div class="t">${esc(k.toUpperCase())}S · ${items.length}</div>
+          ${items.slice(0, 5).map((n) => `<div class="d">${esc(n.label)} <span class="hint">${esc((n.note || '').slice(0, 40))}</span></div>`).join('')}</div>`;
+      }).join('') + `<div class="scorecard"><div class="t">HOW THIS MAP IS BUILT</div><div class="d hint">${esc(g.note)}</div></div>`;
+    } catch { gEl.innerHTML = ''; }
+  }
+  if (sEl) {
+    try {
+      const s = await api(`/api/storylines/${encodeURIComponent(symbol)}`);
+      const tone = (d) => d === 'intensifying' ? 'var(--accent)' : d === 'quietening' ? 'var(--muted)' : 'var(--muted)';
+      sEl.innerHTML = s.lines.length
+        ? s.lines.map((l) => `<div class="scorecard"><div class="t" style="color:${tone(l.direction)}">${esc(l.theme.toUpperCase())} · ${esc(l.direction)}</div>
+            <div class="d">${l.count} disclosure(s) · ${esc(l.span)}</div>
+            <div class="d hint">${esc(l.note)}</div></div>`).join('')
+        : '<div class="scorecard"><div class="t">NO STORYLINES</div><div class="d hint">No themed disclosures stored for this company.</div></div>';
+    } catch { sEl.innerHTML = ''; }
+  }
+}
 
 async function loadDataTruth(symbol) {
   const el = $('#co-datatruth');
