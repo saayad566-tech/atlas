@@ -1,6 +1,6 @@
 {
   "name": "atlas",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "private": true,
   "type": "commonjs",
   "description": "Atlas \u2014 a local-first platform for deep fundamental analysis across nine markets",
@@ -77,7 +77,8 @@
     "verify:market-scope": "node scripts/verify-market-scope.js",
     "verify:filters": "node scripts/verify-filters-models.js",
     "verify:session": "node scripts/verify-session-cmdk.js",
-    "verify:alpha": "node scripts/verify-alpha.js"
+    "verify:alpha": "node scripts/verify-alpha.js",
+    "verify:inventory": "node scripts/verify-feature-inventory.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.5.0"

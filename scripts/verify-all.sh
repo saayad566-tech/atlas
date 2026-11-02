@@ -64,6 +64,7 @@ run filters   verify-filters-models.js
 run session   verify-session-cmdk.js
 run alpha     verify-alpha.js
 run universe  verify-universe-bundle.js
+run inventory verify-feature-inventory.js
 run provenance verify-provenance.js
 run failover  verify-failover.js
 run adapters  verify-adapters.js
