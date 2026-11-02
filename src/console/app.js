@@ -390,6 +390,7 @@ function renderCompany() {
   loadExtras(co.symbol);
   loadCompanyBriefing(co.symbol);
   loadHistory(co.symbol);
+  loadCorporate(co.symbol);
   loadNote(co.symbol);
   researchPrompt(co.symbol);
   $('#btn-research').onclick = () => loadResearch(co.symbol);
@@ -1663,6 +1664,36 @@ async function loadMarketBriefing() {
   } catch { el.hidden = true; }
 }
 
+
+
+async function loadCorporate(symbol) {
+  const rows = $('#co-timeline-panel'); const flows = $('#co-flows');
+  if (rows) {
+    try {
+      const t = await api(`/api/timeline/${encodeURIComponent(symbol)}?limit=25`);
+      rows.innerHTML = t.events.length
+        ? t.events.map((e) => `<tr>
+            <td class="mono">${esc(e.date)}</td>
+            <td class="l">${e.significance === 'high' ? '<b>' : ''}${esc(e.title)}${e.significance === 'high' ? '</b>' : ''}<div class="hint">${esc(e.kind)}</div></td>
+            <td class="l">${esc((e.detail || '').slice(0, 90))}</td></tr>`).join('')
+        : '<tr><td colspan="3" class="hint">No disclosures stored for this company.</td></tr>';
+    } catch { rows.innerHTML = ''; }
+  }
+  if (flows) {
+    try {
+      const f = await api(`/api/flows/${encodeURIComponent(symbol)}`);
+      const i = f.insider;
+      const tone = i.netDirection === 'net buying' ? 'var(--ok)' : i.netDirection === 'net selling' ? 'var(--err)' : 'var(--muted)';
+      flows.innerHTML = `<div class="scorecard"><div class="t" style="color:${tone}">INSIDER FLOW · ${esc(i.netDirection.toUpperCase())}</div>
+          <div class="d">${i.buys} buys vs ${i.sells} sells over ${i.windowDays} days</div>
+          <div class="d hint">${esc(i.largest ? `Largest: ${i.largest.name} on ${i.largest.date}` : 'No trades recorded')}</div></div>
+        ${f.ownership ? `<div class="scorecard"><div class="t">OWNERSHIP</div>
+          <div class="d">Institutions ${f.ownership.institutionsPct ?? '—'}% · Insiders ${f.ownership.insidersPct ?? '—'}%</div>
+          <div class="d hint">${esc(f.ownership.verdict)}</div></div>` : ''}
+        <div class="scorecard"><div class="t">How to read this</div><div class="d hint">${esc(f.note)}</div></div>`;
+    } catch { flows.innerHTML = ''; }
+  }
+}
 
 async function loadHistory(symbol) {
   const el = $('#co-history');

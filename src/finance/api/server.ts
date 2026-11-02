@@ -53,6 +53,7 @@ import { addEntry, listJournal, closeEntry, journalScorecard } from '../core/jou
 import { trendingSectors, rankCandidates, peerPercentiles } from '../core/discover';
 import { metricHistory, earningsSurprises } from '../core/history';
 import { loadSeries, backtest } from '../core/backtest';
+import { corporateTimeline, insiderFlows } from '../core/corporate';
 import { registrySummary, sourcesFor, SOURCE_REGISTRY } from '../core/sourceRegistry';
 import { SourcePool, runWithFailover } from '../core/failover';
 import { listRatios, saveRatio, deleteRatio, applyRatios, validateFormula, allowedFields, RatioError } from '../core/customRatios';
@@ -1416,9 +1417,18 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       if (p === '/api/watchlist/calendar') return json(res, 200, watchlistCalendar(db.db));
       if (p.startsWith('/api/timeline/')) {
         const sym = decodeURIComponent(p.slice('/api/timeline/'.length));
-        const t = companyTimeline(db.db, sym);
-        if (!t) return json(res, 404, { error: 'No such company' });
-        return json(res, 200, { symbol: sym, events: t });
+        // Richer timeline: announcements, corporate actions and insider trades in one
+        // chronological account, with a significance flag and per-kind counts.
+        const t = corporateTimeline(db.db, sym, Number(url.searchParams.get('limit') ?? 60));
+        if (t) return json(res, 200, t);
+        const basic = companyTimeline(db.db, sym);
+        return basic ? json(res, 200, { symbol: sym, events: basic, counts: {}, note: 'Basic timeline.' })
+                     : json(res, 404, { error: 'No such company' });
+      }
+      if (p.startsWith('/api/flows/')) {
+        const sym = decodeURIComponent(p.slice('/api/flows/'.length));
+        const f = insiderFlows(db.db, sym, Number(url.searchParams.get('days') ?? 365));
+        return f ? json(res, 200, f) : json(res, 404, { error: 'No such company in this market' });
       }
       if (p.startsWith('/api/sector/') && p.endsWith('/companies')) {
         const name = decodeURIComponent(p.slice('/api/sector/'.length, -'/companies'.length));
