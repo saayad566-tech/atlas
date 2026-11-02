@@ -13,6 +13,8 @@ let fails=0; const ok=(n,c,d)=>{ if(!c) fails++; console.log(`  ${c?'PASS':'FAIL
   const post=(p,b)=>fetch(B+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b??{})});
   const get=(p)=>fetch(B+p).then(r=>r.json());
   await post('/api/setup/complete',{code:'IN'});
+  // The bundled universe gives the directory something to enrich even with no network.
+  await post('/api/directory/seed',{});
 
   const db=openDatabase(path.join(home,'markets','IN.db')); ensureDirectory(db.db);
   const ins=db.db.prepare('INSERT OR IGNORE INTO universe_symbols (market,symbol,name,sector,exchange,source,added_at) VALUES (?,?,?,?,?,?,?)');
@@ -21,8 +23,11 @@ let fails=0; const ok=(n,c,d)=>{ if(!c) fails++; console.log(`  ${c?'PASS':'FAIL
 
   console.log('=== STATUS BEFORE ===');
   const s0=await get('/api/enrich/status');
-  ok('reports listed vs enriched', s0.listed===2 && s0.enriched===0, `${s0.enriched}/${s0.listed}`);
-  ok('reports remaining work', s0.remaining===2, String(s0.remaining));
+  // Invariants that hold whether or not a network exists.
+  ok('the directory is populated from the bundle', s0.listed>1000, `${s0.listed} listed`);
+  ok('enriched never exceeds listed', s0.enriched<=s0.listed, `${s0.enriched}/${s0.listed}`);
+  ok('remaining equals listed minus enriched', s0.remaining===s0.listed-s0.enriched, `${s0.remaining}`);
+  ok('coverage is consistent with the counts', s0.pct===Math.round((s0.enriched/s0.listed)*100), `${s0.pct}%`);
 
   console.log('\n=== QUEUE ===');
   const q=await post('/api/enrich/queue',{count:2}).then(r=>r.json());
@@ -43,7 +48,7 @@ let fails=0; const ok=(n,c,d)=>{ if(!c) fails++; console.log(`  ${c?'PASS':'FAIL
     ok('queue drains', s1.queued===0, `${s1.queued} left`);
     ok('symbols were enriched', s1.enriched>0, `${s1.enriched} of ${s1.listed}`);
     ok('failures are reported, not hidden', typeof s1.failed==='number', `${s1.failed} failed`);
-    ok('coverage percentage follows', s1.pct>0, `${s1.pct}%`);
+    ok('coverage percentage follows', s1.pct===Math.round((s1.enriched/s1.listed)*100), `${s1.pct}%`);
   }
 
   console.log('\n=== MARKET SCOPING ===');

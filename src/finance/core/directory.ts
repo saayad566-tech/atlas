@@ -4,6 +4,7 @@
 // walking every sector and unioning the results. The directory lists every listed symbol;
 // full company data is still fetched on demand, which keeps the app lightweight.
 import type { Database as DB } from 'better-sqlite3';
+import { loadUniverse } from './universeBundle';
 
 // NOTE: Yahoo caps a single screener query at roughly 1,150 rows. Sectors larger than
 // that (Consumer Cyclical, Industrials) stop at exactly 1,150 and are reported SHORT.
@@ -25,6 +26,29 @@ CREATE INDEX IF NOT EXISTS idx_universe_sector ON universe_symbols(market, secto
 `;
 
 export function ensureDirectory(db: DB): void { db.exec(DIRECTORY_DDL); }
+
+/**
+ * Fill the directory from the bundled universe when a network sync is not possible.
+ *
+ * The app ships 27,117 companies per the bundle, so a fresh offline install can still list,
+ * search and enrich. A network sync later refines it with live market caps.
+ */
+export function seedFromBundle(db: DB, market: string): { inserted: number; market: string } {
+  db.exec(DIRECTORY_DDL);
+  const rows = loadUniverse(market);
+  if (!rows.length) return { inserted: 0, market: market.toUpperCase() };
+  const ins = db.prepare(`INSERT OR REPLACE INTO universe_symbols
+    (market, symbol, name, sector, exchange, source, added_at) VALUES (?,?,?,?,?,?,?)`);
+  const now = Date.now();
+  let inserted = 0;
+  const tx = db.transaction(() => {
+    for (const r of rows) {
+      try { ins.run(market.toUpperCase(), r.symbol, r.name, r.sector ?? 'Unclassified', '', 'bundle', now); inserted++; } catch { /* skip */ }
+    }
+  });
+  tx();
+  return { inserted, market: market.toUpperCase() };
+}
 
 /** Market-cap bands used to get past Yahoo's ~1,150-row cap on a single sector query. */
 export const MCAP_BRACKETS: Array<[number, number]> = [

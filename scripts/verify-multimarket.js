@@ -35,7 +35,7 @@ let fails=0; const ok=(n,c,d)=>{ if(!c) fails++; console.log(`  ${c?'PASS':'FAIL
   console.log('\n=== NO CROSS CONTAMINATION ===');
   let contaminated=[]; let totalSymbols=0;
   for (const mk of ['IN','US','GB','JP','DE','SG','HK','AU','CA']) {
-    const f=path.join(home,'markets',mk+'.db');
+    const f=path.join(home,'markets',mk+'-STOCK.db');
     if(!fs.existsSync(f)) continue;
     const db=openDatabase(f);
     const own=db.db.prepare('SELECT COUNT(*) n FROM universe_symbols WHERE market=?').get(mk).n;

@@ -216,6 +216,12 @@
     <div class="section-h">Corporate timeline <span class="hint">every stored disclosure, newest first</span></div>
     <div class="tablewrap"><table class="dense"><thead><tr><th>Date</th><th class="l">Event</th><th class="l">Detail</th></tr></thead><tbody id="co-timeline-panel"></tbody></table></div>
     <div class="cards" id="co-flows"></div>
+    <div class="section-h">Ask about this company <span class="hint">answered from stored data; a local model is used when one is running</span></div>
+    <div class="askbox">
+      <input id="ask-input" class="input" type="text" aria-label="Ask a question about this company" placeholder="e.g. is it cheap, how is the debt, what is the trend" autocomplete="off" />
+      <button id="ask-go" class="btn primary">Ask</button>
+    </div>
+    <div id="ask-answer" class="briefing" hidden></div>
     <div class="section-h">Alpha factors <span class="hint">statistical features from the stored price series</span></div>
     <div class="cards" id="co-alpha"></div>
     <div class="section-h">Multi-year trend <span class="hint">recomputed from each annual statement</span></div>

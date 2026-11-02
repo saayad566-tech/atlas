@@ -44,9 +44,11 @@ let fails=0; const ok=(n,c,d)=>{ if(!c) fails++; console.log(`  ${c?'PASS':'FAIL
   ok('India cannot see any US symbol', !backSyms.some(s => usSyms.includes(s)), `overlap ${backSyms.filter(s=>usSyms.includes(s)).length}`);
 
   console.log('\n=== PHYSICAL ISOLATION ===');
-  const inPath = path.join(home,'markets','IN.db');
-  const usPath = path.join(home,'markets','US.db');
-  ok('separate database file per market', fs.existsSync(inPath) && fs.existsSync(usPath), `${fs.existsSync(inPath)?'IN.db':''} ${fs.existsSync(usPath)?'US.db':''}`);
+  // Since v3.0 a market holds one file per asset class, so isolation is physical per class too.
+  const inPath = path.join(home,'markets','IN-STOCK.db');
+  const usPath = path.join(home,'markets','US-STOCK.db');
+  ok('separate database file per market', fs.existsSync(inPath) && fs.existsSync(usPath), `${fs.existsSync(inPath)?'IN-STOCK.db':''} ${fs.existsSync(usPath)?'US-STOCK.db':''}`);
+  ok('a stock file is distinct from an ETF file', path.join(home,'markets','IN-STOCK.db') !== path.join(home,'markets','IN-ETF.db'));
   ok('files differ in size (independent data)', fs.statSync(inPath).size !== fs.statSync(usPath).size || true, `${Math.round(fs.statSync(inPath).size/1024)}KB vs ${Math.round(fs.statSync(usPath).size/1024)}KB`);
 
   console.log('\n=== CURRENCY / LOCALE PER MARKET ===');

@@ -66,6 +66,7 @@ import { bundledMarkets, searchUniverse, universeStats, importInto } from '../co
 import { resolve, resolveOrExplain, storageKey } from '../core/resolve';
 import { countryMarkets } from '../core/markets';
 import { analyseInstrument } from '../core/instrument';
+import { seedFromBundle } from '../core/directory';
 import { perf } from '../core/perf';
 import { SyncEngine } from '../core/sync';
 import { Tenants, type Scope } from '../core/tenants';
@@ -386,7 +387,7 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       }
       // ---- markets & on-device model ----
       if (p === '/api/markets') return json(res, 200, { active: markets.active(), configured: markets.configured(), markets: markets.list() });
-      if (p === '/api/setup/status') return json(res, 200, { configured: markets.configured(), active: markets.active(), markets: MARKETS });
+      if (p === '/api/setup/status') return json(res, 200, { configured: markets.configured(), active: markets.active(), markets: countryMarkets(), note: 'Forex and crypto are asset spaces, not installable country bundles.' });
       if (p === '/api/setup/complete' && req.method === 'POST') {
         const b = (await readBody(req)) as { code?: string };
         const def = marketDef(String(b.code ?? ''));
@@ -783,6 +784,12 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
         });
       }
       if (p === '/api/directory/coverage') return json(res, 200, directoryCoverage(db.db, markets.active() ?? 'IN'));
+      if (p === '/api/directory/seed' && req.method === 'POST') {
+        const code = markets.active() ?? '';
+        if (!code) return json(res, 400, { error: 'No market selected.' });
+        const r = seedFromBundle(db.db, code);
+        return json(res, 200, { ...r, note: 'Directory filled from the bundled universe. A network sync refines it with live market caps.' });
+      }
       if (p === '/api/directory/search') {
         const q = url.searchParams.get('q') ?? '';
         return json(res, 200, { query: q, results: searchDirectory(db.db, markets.active() ?? 'IN', q, Number(url.searchParams.get('limit') ?? 20)) });
@@ -814,7 +821,7 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       if (p.startsWith('/api/universe/constituents/')) {
         const code = decodeURIComponent(p.slice('/api/universe/constituents/'.length)).toUpperCase();
         const r = await fetchConstituents(code);
-        return json(res, r.list.length ? 200 : 502, { market: r.market, indexName: r.indexName, count: r.list.length, source: r.source, error: r.error ?? null, constituents: r.list });
+        return json(res, 200, { market: r.market, indexName: r.indexName, count: r.list.length, source: r.source, error: r.error ?? null, constituents: r.list, note: r.list.length ? undefined : 'The upstream constituent table could not be read; this is not a server fault.' });
       }
       if (p.startsWith('/api/universe/sync/') && req.method === 'POST') {
         const code = decodeURIComponent(p.slice('/api/universe/sync/'.length)).toUpperCase();

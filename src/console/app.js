@@ -597,7 +597,17 @@ function renderCompany() {
   loadAlpha(co.symbol);
   loadBackData(co.symbol);
   if ($('#bd-go')) { $('#bd-go').onclick = () => loadBackData(co.symbol); }
-  if ($('#ask-go')) { $('#ask-go').onclick = () => askCompany(co.symbol); $('#ask-input').onkeydown = (e) => { if (e.key === 'Enter') askCompany(co.symbol); }; }
+  // Ask panel: the grounded answer path, wired to whatever the user types.
+  const askGo = $('#ask-go');
+  if (askGo) {
+    const run = () => askCompany(co.symbol);
+    askGo.onclick = run;
+    const input = $('#ask-input');
+    if (input) {
+      input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); run(); } };
+      input.value = '';
+    }
+  }
   loadNote(co.symbol);
   researchPrompt(co.symbol);
   $('#btn-research').onclick = () => loadResearch(co.symbol);
@@ -923,7 +933,6 @@ async function loadPrefs() {
 function applyPrefs() {
   document.documentElement.setAttribute('data-theme', state.prefs.theme === 'dark' ? 'dark' : 'light');
   state.density = state.prefs.density;
-  const grid = $('#ws-grid'); if (grid) grid.classList.toggle('compact', state.prefs.density === 'compact');
   const wsgrid = document.querySelector('#result-body');
   void wsgrid;
   for (const [panel, on] of Object.entries(state.prefs.panels || {})) {
@@ -2541,7 +2550,7 @@ async function loadRefreshPanel() {
         <div class="d">${s.lastRunAt ? new Date(s.lastRunAt).toLocaleTimeString() : 'never'}</div>
         <div class="d hint">${s.lastUpdated} updated · ${s.lastFailed} failed · ${s.ticks} total pass(es)</div></div>`;
     el.querySelectorAll('[data-ref]').forEach((b) => {
-      b.onclick = async () => { await api(`/api/refresh/${b.dataset.ref}`, { method: 'POST', body: '{}' }); toast(`Auto-update ${b.dataset.ref}`); loadRefreshPanel(); };
+      b.onclick = async () => { await api(`/api/refresh/now`, { method: 'POST', body: '{}' }); toast(`Auto-update ${b.dataset.ref}`); loadRefreshPanel(); };
     });
   } catch { el.innerHTML = ''; }
 }
