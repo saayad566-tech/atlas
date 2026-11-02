@@ -1449,7 +1449,8 @@ async function loadUniverse() {
   el.innerHTML = '<p class="hint">Fetching the index constituent list…</p>';
   try {
     const mk = await api('/api/markets');
-    const code = mk.active || 'IN';
+    const code = mk.active || activeMarket();
+    if (!code) { el.innerHTML = '<p class="hint">Pick a market first.</p>'; return; }
     const r = await api(`/api/universe/constituents/${code}`);
     if (!r.count) {
       el.innerHTML = `<div class="scorecard"><div class="t">${esc(r.indexName)}</div><div class="d hint">No constituent table could be parsed for this index (${esc(r.error || 'unknown')}).</div></div>`;
@@ -2612,7 +2613,7 @@ async function loadImport() {
 
 async function loadMacro() {
   try {
-    const { series } = await api('/api/macro');
+    const { series } = await api(`/api/macro?${marketParam('country').replace(/^&/, '')}`);
     $('#macro-cards').innerHTML = series.length
       ? series.map((s) => {
         const last = s.points[s.points.length - 1];
@@ -2708,7 +2709,8 @@ function wire() {
   };
   $('#btn-macro-refresh').onclick = async () => {
     $('#btn-macro-refresh').textContent = 'Refreshing…';
-    try { const r = await api('/api/macro/refresh', { method: 'POST', body: JSON.stringify({ country: 'IN' }) }); await loadMacro(); $('#btn-macro-refresh').textContent = `Refresh (${r.inserted} points)`; }
+    try { const mk = activeMarket();
+      const r = await api('/api/macro/refresh', { method: 'POST', body: JSON.stringify({ country: mk || undefined }) }); await loadMacro(); $('#btn-macro-refresh').textContent = `Refresh (${r.inserted} points)`; }
     catch { $('#btn-macro-refresh').textContent = 'Refresh failed'; }
   };
   $('#btn-import').onclick = async () => {

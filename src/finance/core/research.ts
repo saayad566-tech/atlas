@@ -38,7 +38,7 @@ export interface ResearchReport {
   coverage: { complete: number; partial: number; unavailable: number; pct: number };
 }
 
-export function researchReport(db: DB, symbol: string, market = 'IN'): ResearchReport | null {
+export function researchReport(db: DB, symbol: string, market: string): ResearchReport | null {
   const row = db.prepare(`SELECT * FROM v_latest WHERE UPPER(symbol)=UPPER(?)`).get(symbol) as Record<string, unknown> | undefined;
   if (!row) return null;
   const sym = String(row['symbol']);

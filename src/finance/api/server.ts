@@ -1814,10 +1814,20 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       }
 
       // ---- macro (World Bank, free) ----
-      if (p === '/api/macro' && req.method === 'GET') return json(res, 200, { series: macroSeries(db.db), catalogue: WORLD_BANK_CATALOGUE });
+      if (p === '/api/macro' && req.method === 'GET') {
+        // Scoped to the active market: a user in Japan must not see India's macro series.
+        const country = url.searchParams.get('country') ?? markets.active() ?? '';
+        if (!country) return json(res, 400, { error: 'No market selected.' });
+        return json(res, 200, { country, series: macroSeries(db.db, country), catalogue: WORLD_BANK_CATALOGUE });
+      }
       if (p === '/api/macro/refresh' && req.method === 'POST') {
         const b = (await readBody(req)) as { country?: string };
-        return json(res, 200, await fetchWorldBank(db.db, String(b.country ?? 'IN')));
+        // Fall back to the active market, never to a hardcoded one — otherwise a user in
+        // Japan would silently refresh India's macro series.
+        const country = String(b.country ?? markets.active() ?? '');
+        if (!country) return json(res, 400, { error: 'No market selected.' });
+        const r = await fetchWorldBank(db.db, country);
+        return json(res, 200, { ...r, country });
       }
 
       // ---- quotes (Yahoo, free) ----

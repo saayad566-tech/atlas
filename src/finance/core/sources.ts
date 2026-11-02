@@ -56,7 +56,7 @@ export async function fetchWorldBank(
   return { inserted, indicators: results };
 }
 
-export function macroSeries(db: DB, country = 'IN'): Array<{ indicator: string; label: string; points: Array<{ year: number; value: number }> }> {
+export function macroSeries(db: DB, country: string): Array<{ indicator: string; label: string; points: Array<{ year: number; value: number }> }> {
   const rows = db.prepare(`SELECT indicator, year, value FROM macro WHERE country=? ORDER BY indicator, year`).all(country) as Array<{ indicator: string; year: number; value: number }>;
   const byInd = new Map<string, Array<{ year: number; value: number }>>();
   for (const r of rows) {
