@@ -62,6 +62,7 @@ import { priceHistory, dataCoverage, type Interval } from '../core/pricehistory'
 import { marketNews, persistNews, storedNews, newsCoverage } from '../core/newsroom';
 import { sessionFor, allSessions } from '../core/session';
 import { summarise, alphaFactors } from '../core/alpha';
+import { bundledMarkets, searchUniverse, universeStats, importInto } from '../core/universeBundle';
 import type { Bar as AlphaBar } from '../core/alpha';
 import { listStrategies, saveStrategy, deleteStrategy, recordStrategyResult, compileConditions } from '../core/strategy';
 import { registrySummary, sourcesFor, SOURCE_REGISTRY } from '../core/sourceRegistry';
@@ -1482,6 +1483,34 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       // ---- newsroom: per-country market news, cached for offline reading ----
       // ---- trading sessions ----
       // ---- alpha factors: statistical features from stored prices ----
+      // ---- bundled symbol universe (FinanceDatabase, MIT) ----
+      if (p === '/api/bundle') {
+        return json(res, 200, {
+          markets: bundledMarkets(),
+          note: 'Bundled offline from FinanceDatabase (MIT). Complete listed-company lists per market; prices are fetched separately.',
+        });
+      }
+      if (p === '/api/bundle/search') {
+        const code = url.searchParams.get('market') ?? markets.active() ?? 'IN';
+        const q = url.searchParams.get('q') ?? '';
+        const limit = Math.min(Math.max(Number(url.searchParams.get('limit') ?? 25), 1), 100);
+        const results = searchUniverse(code, q, limit);
+        return json(res, 200, { market: code, query: q, count: results.length, results });
+      }
+      if (p.startsWith('/api/bundle/') && p.endsWith('/import') && req.method === 'POST') {
+        const code = decodeURIComponent(p.slice('/api/bundle/'.length, -'/import'.length));
+        const active = markets.active() ?? 'IN';
+        if (code.toUpperCase() !== active) {
+          return json(res, 409, { error: `The active market is ${active}. Switch before importing ${code}.` });
+        }
+        const r = importInto(db.db, code);
+        return json(res, 200, { ...r, note: 'Symbols listed. Prices and statements are fetched per company.' });
+      }
+      if (p.startsWith('/api/bundle/')) {
+        const code = decodeURIComponent(p.slice('/api/bundle/'.length));
+        const stats = universeStats(code);
+        return stats.total ? json(res, 200, stats) : json(res, 404, { error: `No bundled universe for ${code}` });
+      }
       if (p.startsWith('/api/alpha/')) {
         const sym = decodeURIComponent(p.slice('/api/alpha/'.length));
         const c = db.db.prepare(`SELECT id FROM companies WHERE UPPER(symbol)=UPPER(?)`).get(sym) as { id: number } | undefined;
