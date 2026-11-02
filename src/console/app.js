@@ -78,6 +78,39 @@ function marketParam(key = 'market') {
 }
 
 
+
+// ---- asset classes ---------------------------------------------------------
+async function loadAssets() {
+  const el = $('#asset-switch');
+  if (!el) return;
+  try {
+    const r = await api('/api/assets');
+    el.innerHTML = (r.classes || []).map((c) =>
+      `<option value="${esc(c.id)}"${c.id === r.active ? ' selected' : ''}>${esc(c.plural)}</option>`).join('');
+    el.onchange = async () => {
+      try {
+        await api('/api/focus/class', { method: 'POST', body: JSON.stringify({ assetClass: el.value }) });
+        toast(`Showing ${el.options[el.selectedIndex].text}`);
+        refreshView();
+      } catch { toast('Could not switch asset class'); }
+    };
+  } catch { el.hidden = true; }
+}
+
+/** Focus an instrument: the symbol decides the market and the class. */
+async function focusInstrument(symbol) {
+  try {
+    const r = await api('/api/focus', { method: 'POST', body: JSON.stringify({ symbol }) });
+    toast(r.note || `Focused ${r.focused}`);
+    // A market switch reloads the shell; a class switch only needs a refresh.
+    if (r.market !== state.market) { location.reload(); return; }
+    state.market = r.market;
+    document.body.dataset.market = r.market;
+    await loadAssets();
+    await openCompany(r.focused);
+  } catch (e) { toast(e.message || 'Could not focus that instrument'); }
+}
+
 // ---- trading session badge -------------------------------------------------
 async function loadSession() {
   const el = $('#session-badge');
@@ -114,7 +147,7 @@ function cmdkChoose(i) {
   const it = cmdkItems[i];
   if (!it) return;
   cmdkClose();
-  openCompany(it.symbol);
+  focusInstrument(it.symbol);
 }
 
 function cmdkOpen() {
@@ -2782,6 +2815,7 @@ function wire() {
   } catch { /* the market is unknown; server defaults apply */ }
 })();
 wireCommandPalette();
+loadAssets();
 void bootSetup().then((ready) => { if (ready) { loadSavedScreens(); loadSectors(); loadFields(); loadMarkets(); loadHealth(); } });
   if (false) loadSavedScreens();
   loadSectors();

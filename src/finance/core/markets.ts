@@ -4,6 +4,8 @@
 // another. The strongest guarantee is not a WHERE clause; it is a separate database
 // file per market. Nothing in the India file can be read while the US file is open.
 import * as fs from 'fs';
+import { ASSETS, type AssetClass } from './assets';
+import { storageKey } from './resolve';
 import * as path from 'path';
 import { openDatabase, type Db } from './db';
 
@@ -16,6 +18,8 @@ export interface MarketDef {
   timezone: string;
   /** Yahoo suffix used to resolve symbols, e.g. '.NS' for India. */
   suffix: string;
+  /** Not a country: a global asset space (forex, crypto). Hidden from the country picker. */
+  pseudo?: boolean;
   exchanges: string[];
   fiscalYearEnd: string;
   benchmark: string;
@@ -34,6 +38,8 @@ export const MARKETS: MarketDef[] = [
   { code: 'HK', name: 'Hong Kong', currency: 'HKD', symbol: 'HK$', locale: 'en-HK', timezone: 'Asia/Hong_Kong', suffix: '.HK', exchanges: ['HKEX'], fiscalYearEnd: '12-31', benchmark: '^HSI', flag: '🇭🇰', bundleNote: 'HKEX, ~2,500 symbols' },
   { code: 'AU', name: 'Australia', currency: 'AUD', symbol: 'A$', locale: 'en-AU', timezone: 'Australia/Sydney', suffix: '.AX', exchanges: ['ASX'], fiscalYearEnd: '06-30', benchmark: '^AXJO', flag: '🇦🇺', bundleNote: 'ASX 200 + extras, ~2,000 symbols' },
   { code: 'CA', name: 'Canada', currency: 'CAD', symbol: 'C$', locale: 'en-CA', timezone: 'America/Toronto', suffix: '.TO', exchanges: ['TSX'], fiscalYearEnd: '12-31', benchmark: '^GSPTSE', flag: '🇨🇦', bundleNote: 'TSX, ~1,500 symbols' },
+  { code: 'FX', name: 'Forex', currency: 'USD', symbol: '$', locale: 'en-US', timezone: 'UTC', suffix: '', exchanges: ['FX'], fiscalYearEnd: '12-31', benchmark: '', flag: '💱', bundleNote: 'Currency pairs, 24 hours across overlapping sessions', pseudo: true },
+  { code: 'GLOBAL', name: 'Crypto', currency: 'USD', symbol: '$', locale: 'en-US', timezone: 'UTC', suffix: '', exchanges: ['CRYPTO'], fiscalYearEnd: '12-31', benchmark: '', flag: '₿', bundleNote: 'Digital assets, trading continuously', pseudo: true },
 ];
 
 export function marketDef(code: string): MarketDef | undefined {
@@ -47,6 +53,7 @@ export function marketDef(code: string): MarketDef | undefined {
 export class MarketManager {
   private handles = new Map<string, Db>();
   private current: string | null;
+  private currentClass: AssetClass | null = null;
   private readonly metaFile: string;
 
   constructor(private dataDir: string, initial = 'IN') {
@@ -70,24 +77,57 @@ export class MarketManager {
     try { fs.writeFileSync(this.metaFile, JSON.stringify({ active: code, at: new Date().toISOString() })); } catch { /* read-only fs */ }
   }
 
-  /** Path of a market's database — exposed so tests can assert isolation by file. */
-  dbPath(code: string): string {
-    return path.join(this.dataDir, 'markets', `${code.toUpperCase()}.db`);
+  /**
+   * Path of a database. A market now holds one file per asset class, so India's stocks and
+   * India's ETFs are physically separate. The pre-3.0 name (IN.db) is migrated on first use
+   * and kept until the new file verifies, so no data is lost.
+   */
+  dbPath(code: string, assetClass: AssetClass = 'stock'): string {
+    const key = storageKey(code, assetClass);
+    const target = path.join(this.dataDir, 'markets', `${key}.db`);
+    if (fs.existsSync(target)) return target;
+    const legacy = path.join(this.dataDir, 'markets', `${code.toUpperCase()}.db`);
+    if (assetClass === 'stock' && fs.existsSync(legacy)) {
+      try {
+        fs.copyFileSync(legacy, target);
+        const size = fs.statSync(target).size;
+        if (size > 0) return target;
+        fs.rmSync(target, { force: true });
+      } catch { /* fall through to a fresh file */ }
+    }
+    return target;
   }
 
-  open(code: string): Db {
+  /** Which asset classes have a database on disk for this market. */
+  installedClasses(code: string): AssetClass[] {
+    const c = code.toUpperCase();
+    return ASSETS.map((a) => a.id).filter((id) => fs.existsSync(path.join(this.dataDir, 'markets', `${c}-${id.toUpperCase()}.db`)));
+  }
+
+  open(code: string, assetClass: AssetClass = this.currentClass ?? 'stock'): Db {
     const c = code.toUpperCase();
     if (!marketDef(c)) throw new Error(`Unknown market "${code}"`);
-    const existing = this.handles.get(c);
+    const key = `${c}:${assetClass}`;
+    const existing = this.handles.get(key);
     if (existing) return existing;
-    const db = openDatabase(this.dbPath(c));
-    this.handles.set(c, db);
+    const db = openDatabase(this.dbPath(c, assetClass));
+    this.handles.set(key, db);
     return db;
   }
 
   configured(): boolean { return this.current !== null; }
 
   active(): string | null { return this.current; }
+
+  /** The active asset class. Stocks until the user focuses something else. */
+  activeClass(): AssetClass { return this.currentClass ?? 'stock'; }
+
+  /** Switch asset class within the current market. */
+  switchClass(assetClass: AssetClass): AssetClass {
+    this.currentClass = assetClass;
+    if (this.current) this.writeActive(this.current);
+    return assetClass;
+  }
 
   /** Throws when no market is configured — callers must handle the setup state. */
   activeDb(): Db {
@@ -141,9 +181,12 @@ export class MarketManager {
     return def;
   }
 
-  /** Per-market stats for the switcher, read from each file independently. */
+  /**
+   * Per-market stats for the switcher, read from each file independently.
+   * Countries only: pseudo-markets (FX, GLOBAL) are asset spaces, not places.
+   */
   list(): Array<MarketDef & { active: boolean; companies: number; hasData: boolean; dbBytes: number }> {
-    return MARKETS.map((m) => {
+    return countryMarkets().map((m) => {
       let companies = 0;
       let dbBytes = 0;
       try {
@@ -178,4 +221,9 @@ export class MarketManager {
     for (const [, db] of this.handles) { try { db.db.close(); } catch { /* already closed */ } }
     this.handles.clear();
   }
+}
+
+/** Real countries only — the setup picker and market switcher use this. */
+export function countryMarkets(): MarketDef[] {
+  return MARKETS.filter((m) => !m.pseudo);
 }

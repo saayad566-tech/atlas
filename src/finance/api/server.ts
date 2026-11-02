@@ -63,6 +63,10 @@ import { marketNews, persistNews, storedNews, newsCoverage } from '../core/newsr
 import { sessionFor, allSessions } from '../core/session';
 import { summarise, alphaFactors } from '../core/alpha';
 import { bundledMarkets, searchUniverse, universeStats, importInto } from '../core/universeBundle';
+import { resolve, resolveOrExplain, storageKey } from '../core/resolve';
+import { countryMarkets } from '../core/markets';
+import { analyseInstrument } from '../core/instrument';
+import { ASSETS, assetDef, type AssetClass } from '../core/assets';
 import type { Bar as AlphaBar } from '../core/alpha';
 import { listStrategies, saveStrategy, deleteStrategy, recordStrategyResult, compileConditions } from '../core/strategy';
 import { registrySummary, sourcesFor, SOURCE_REGISTRY } from '../core/sourceRegistry';
@@ -322,7 +326,7 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
     const setupExempt = p === '/api/health' || p === '/api/markets' || p.startsWith('/api/auth/') || p.startsWith('/api/setup') || p === '/api/seed' || !p.startsWith('/api/');
     if (!markets.configured() && !setupExempt) {
       res.writeHead(428, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Choose a country bundle to begin.', code: 'SETUP_REQUIRED', markets: MARKETS.map((m) => ({ code: m.code, name: m.name, flag: m.flag })) }));
+      res.end(JSON.stringify({ error: 'Choose a country bundle to begin.', code: 'SETUP_REQUIRED', markets: countryMarkets().map((m) => ({ code: m.code, name: m.name, flag: m.flag })) }));
       return;
     }
 
@@ -1483,6 +1487,57 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       // ---- newsroom: per-country market news, cached for offline reading ----
       // ---- trading sessions ----
       // ---- alpha factors: statistical features from stored prices ----
+      // ---- analysis for a non-stock instrument ----
+      if (p.startsWith('/api/instrument/')) {
+        const sym = decodeURIComponent(p.slice('/api/instrument/'.length));
+        const r = resolve(sym);
+        if (!r) return json(res, 400, { error: `"${sym}" could not be resolved to a market.` });
+        const a = analyseInstrument(db.db, r.symbol, r.assetClass);
+        if (!a) return json(res, 200, { ...r, assetClass: r.assetClass, note: 'Stocks use the company view, which has deeper panels.', stock: true });
+        return json(res, 200, { ...a, resolution: r, classDef: assetDef(r.assetClass) });
+      }
+      // ---- asset classes and instrument-first navigation ----
+      if (p === '/api/assets') {
+        return json(res, 200, {
+          active: markets.activeClass(),
+          classes: ASSETS.map((a) => ({
+            id: a.id, name: a.name, plural: a.plural, note: a.note,
+            continuous: a.continuous, capabilities: a.capabilities,
+            installed: markets.active() ? markets.installedClasses(markets.active()!) .includes(a.id) : false,
+          })),
+          note: 'Each class has its own analysis and its own database. A panel appears only where it applies.',
+        });
+      }
+      if (p === '/api/resolve') {
+        const symbol = url.searchParams.get('symbol') ?? '';
+        const r = resolveOrExplain(symbol);
+        return json(res, r.ok ? 200 : 400, r.ok ? { ...r.resolution, classDef: assetDef(r.resolution.assetClass) } : { error: r.error });
+      }
+      // Focusing an instrument sets the asset class and market from the symbol itself.
+      if (p === '/api/focus' && req.method === 'POST') {
+        const b = (await readBody(req)) as { symbol?: string };
+        const r = resolveOrExplain(String(b.symbol ?? ''));
+        if (!r.ok) return json(res, 400, { error: r.error });
+        const res2 = r.resolution;
+        if (!markets.active()) return json(res, 428, { error: 'Complete setup before focusing an instrument.', resolution: res2 });
+        if (res2.market !== markets.active()) {
+          try { markets.switch(res2.market); } catch { return json(res, 400, { error: `Cannot switch to ${res2.market}` }); }
+        }
+        markets.switchClass(res2.assetClass);
+        return json(res, 200, {
+          focused: res2.symbol, assetClass: res2.assetClass, market: res2.market,
+          currency: res2.currency, name: res2.name, basis: res2.basis,
+          classDef: assetDef(res2.assetClass),
+          note: `Switched to ${res2.market} · ${assetDef(res2.assetClass).plural}.`,
+        });
+      }
+      if (p === '/api/focus/class' && req.method === 'POST') {
+        const b = (await readBody(req)) as { assetClass?: string };
+        const cls = String(b.assetClass ?? '');
+        if (!ASSETS.some((a) => a.id === cls)) return json(res, 400, { error: `Unknown asset class "${cls}"` });
+        markets.switchClass(cls as AssetClass);
+        return json(res, 200, { assetClass: cls, market: markets.active(), classDef: assetDef(cls as AssetClass) });
+      }
       // ---- bundled symbol universe (FinanceDatabase, MIT) ----
       if (p === '/api/bundle') {
         return json(res, 200, {
