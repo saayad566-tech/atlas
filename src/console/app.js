@@ -1635,6 +1635,35 @@ async function loadAsk(symbol) {
 
 // ---- morning briefing -------------------------------------------------------
 
+
+async function loadAdvisors() {
+  const el = $('#advisors-panel');
+  if (!el) return;
+  try {
+    const r = await api(`/api/advisors?country=${encodeURIComponent(state.market || 'IN')}`);
+    el.innerHTML = r.advisors.map((a) => `<div class="scorecard">
+        <div class="t">${esc(a.name)} <span class="hint">${esc(a.country)} · ${esc(a.era)}</span></div>
+        <div class="d">${esc(a.approach)}</div>
+        <div class="d hint">${esc(a.criteria.map((c) => `${c.field} ${c.op} ${c.value}`).join(' · '))}</div>
+        <div class="exprrow" style="margin-top:6px">
+          <button class="btn xs" data-advisor="${esc(a.id)}">Apply to this market</button>
+          <span class="hint" data-advisor-out="${esc(a.id)}"></span>
+        </div>
+        <div class="d hint">${esc(a.confidence === 'documented' ? 'Documented approach' : 'Characterisation, not a published rule set')}</div></div>`).join('')
+      + `<div class="scorecard"><div class="t">COVERAGE</div><div class="d hint">${r.all} methods across ${r.coverage.length} markets: ${esc(r.coverage.map((c) => c.country + ' ' + c.count).join(' · '))}</div></div>`;
+    el.querySelectorAll('[data-advisor]').forEach((b) => {
+      b.onclick = async () => {
+        const out = el.querySelector(`[data-advisor-out="${b.dataset.advisor}"]`);
+        if (out) out.textContent = 'running…';
+        try {
+          const res = await api(`/api/advisors/${encodeURIComponent(b.dataset.advisor)}/run`);
+          if (out) out.textContent = `${res.matches} of ${res.total} match (${res.sharePct}%)`;
+        } catch (e) { if (out) out.textContent = e.message; }
+      };
+    });
+  } catch { el.innerHTML = ''; }
+}
+
 async function loadDiscover() {
   const secEl = $('#discover-sectors'); const pickEl = $('#discover-picks');
   if (!secEl || !pickEl) return;
@@ -2423,7 +2452,7 @@ function wire() {
       if (v === 'rank') loadRank();
       if (v === 'portfolio') { loadPortfolio(); loadPortfolioPnl(); }
       if (v === 'import') loadImport();
-      if (v === 'intel') { loadIntel(); loadJobs(); loadTools(); loadAdmin(); loadUniverse(); loadMovers(); loadSectorBreadth();  loadSectors(); loadDiscover(); }
+      if (v === 'intel') { loadIntel(); loadJobs(); loadTools(); loadAdmin(); loadUniverse(); loadMovers(); loadSectorBreadth();  loadSectors(); loadDiscover(); loadAdvisors(); }
       if (v === 'store') { loadStore(); loadModels(); }
       if (v === 'macro') loadMacro();
     };

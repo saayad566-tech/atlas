@@ -57,6 +57,7 @@ import { corporateTimeline, insiderFlows } from '../core/corporate';
 import { companyTruth, marketTruth } from '../core/datatruth';
 import { companyGraph, storylines } from '../core/graph';
 import { ask } from '../core/ask';
+import { ADVISORS, advisorsFor, findAdvisor, runMethod, libraryCoverage, methodExpression } from '../core/advisors';
 import { listStrategies, saveStrategy, deleteStrategy, recordStrategyResult, compileConditions } from '../core/strategy';
 import { registrySummary, sourcesFor, SOURCE_REGISTRY } from '../core/sourceRegistry';
 import { SourcePool, runWithFailover } from '../core/failover';
@@ -1432,6 +1433,26 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       // ---- data truth: what we actually know, and how much to trust it ----
       // ---- graph, storylines, strategy library, condition builder ----
       // ---- ask: answer a question from stored data ----
+      // ---- investor library: documented methods, runnable as screens ----
+      if (p === '/api/advisors') {
+        const country = url.searchParams.get('country') ?? markets.active() ?? 'IN';
+        return json(res, 200, {
+          country, advisors: advisorsFor(country),
+          all: ADVISORS.length, coverage: libraryCoverage(),
+          note: 'Each entry summarises a documented approach and turns it into a screen. Entries marked "summary" are a characterisation, not a published rule set. No entry quotes the person.',
+        });
+      }
+      if (p.startsWith('/api/advisors/') && p.endsWith('/run')) {
+        const id = decodeURIComponent(p.slice('/api/advisors/'.length, -'/run'.length));
+        const a = findAdvisor(id);
+        if (!a) return json(res, 404, { error: 'No advisor with that id' });
+        const r = runMethod(db.db, a, (expr) => store.screener(expr, { limit: 500 }).rows as unknown as Array<Record<string, unknown>>);
+        return json(res, 200, r);
+      }
+      if (p.startsWith('/api/advisors/')) {
+        const a = findAdvisor(decodeURIComponent(p.slice('/api/advisors/'.length)));
+        return a ? json(res, 200, { advisor: a, expression: methodExpression(a) }) : json(res, 404, { error: 'No advisor with that id' });
+      }
       if (p.startsWith('/api/ask/')) {
         const sym = decodeURIComponent(p.slice('/api/ask/'.length));
         const q = url.searchParams.get('q') ?? '';
