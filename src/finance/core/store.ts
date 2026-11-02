@@ -112,7 +112,10 @@ export class Store {
     const dir = (opts.order ?? 'desc').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
     const limit = Math.max(1, Math.min(500, opts.limit ?? 100));
     const offset = Math.max(0, opts.offset ?? 0);
-    const sql = `SELECT ${ROW_COLUMNS} FROM v_latest WHERE ${compiled.sql} ORDER BY ${sortCol} ${dir} LIMIT ? OFFSET ?`;
+    // Nulls sort last in both directions. A company whose P/E is unknown is not the cheapest
+    // stock on an ascending sort — it is simply unknown, and putting it first misleads.
+    const sql = `SELECT ${ROW_COLUMNS} FROM v_latest WHERE ${compiled.sql}
+      ORDER BY (${sortCol} IS NULL) ASC, ${sortCol} ${dir} LIMIT ? OFFSET ?`;
     const rows = this.db.prepare(sql).all(...compiled.params, limit, offset) as Array<Record<string, unknown>>;
     const total = (this.db.prepare(`SELECT COUNT(*) AS n FROM v_latest WHERE ${compiled.sql}`).get(...compiled.params) as { n: number }).n;
     return { rows: rows.map(toRow), total, sql, params: compiled.params, ms: Date.now() - t0 };

@@ -281,7 +281,7 @@ window.addEventListener('offline', () => { showNetBanner('You are offline. Store
 const cr = (v) => (v === null || v === undefined ? '—' : nf.format(v));
 const pct = (v) => (v === null || v === undefined ? '—' : `${nf1.format(v)}%`);
 const ratio = (v) => (v === null || v === undefined ? '—' : nf2.format(v));
-const money = (v) => `₹${nf2.format(v)}`;
+const money = (v) => (v === null || v === undefined ? '—' : `₹${nf2.format(v)}`);
 const signed = (v) => (v > 0 ? 'num-pos' : v < 0 ? 'num-neg' : '');
 
 // ---- boot -----------------------------------------------------------------
@@ -2137,7 +2137,7 @@ async function loadScreenAnalysis(expression) {
         ${r.histogram.map((b) => `<div class="d" style="display:flex;align-items:center;gap:8px">
           <span class="hint" style="width:120px">${nf.format(b.from)}–${nf.format(b.to)}</span>
           <span style="flex:1;background:var(--bg-2);height:9px;border-radius:5px;overflow:hidden">
-            <span style="display:block;height:9px;width:${Math.round((b.count / maxCount) * 100)}%;background:var(--accent)"></span></span>
+            <span style="display:block;height:9px;width:${maxCount > 0 ? Math.round((b.count / maxCount) * 100) : 0}%;background:var(--accent)"></span></span>
           <span class="hint" style="width:40px;text-align:right">${b.count}</span></div>`).join('')}
         <div class="d hint">${r.count} companies · ${Object.entries(r.categories).map(([k, v]) => `${k} ${v}`).join(' · ')}</div></div>
       <div class="scorecard"><div class="t">Sector mix</div>
@@ -2604,7 +2604,11 @@ async function loadSectors() {
     const r = await api('/api/sectors');
     const sel = $('#sector-filter');
     if (!sel) return;
-    sel.innerHTML = '<option value="">All sectors</option>' + r.sectors.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+    // The API returns {sector, companies} objects, not bare strings — interpolating the
+    // object rendered "[object Object]" for every option and made the filter unusable.
+    const list = (r.sectors || []).map((s) => (typeof s === 'string' ? { sector: s, companies: null } : s));
+    sel.innerHTML = '<option value="">All sectors</option>' + list.map((s) =>
+      `<option value="${esc(s.sector)}">${esc(s.sector)}${s.companies !== null ? ` (${s.companies})` : ''}</option>`).join('');
     sel.onchange = () => {
       const base = $('#expr').value.trim();
       const expr = sel.value ? `Sector = "${sel.value}"${base && !/Sector\s*=/.test(base) ? ' AND (' + base + ')' : ''}` : base.replace(/^Sector\s*=\s*"[^"]*"\s*(AND\s*)?/i, '');
