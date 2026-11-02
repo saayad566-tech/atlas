@@ -561,6 +561,7 @@ function renderCompany() {
   loadCorporate(co.symbol);
   loadDataTruth(co.symbol);
   loadGraph(co.symbol);
+  loadAlpha(co.symbol);
   loadBackData(co.symbol);
   if ($('#bd-go')) { $('#bd-go').onclick = () => loadBackData(co.symbol); }
   if ($('#ask-go')) { $('#ask-go').onclick = () => askCompany(co.symbol); $('#ask-input').onkeydown = (e) => { if (e.key === 'Enter') askCompany(co.symbol); }; }
@@ -1930,6 +1931,24 @@ async function askCompany(symbol) {
       <div class="d hint">${r.evidence.map((e) => `${esc(e.label)}: ${esc(e.value)}`).join(' · ')}</div>
       <div class="d hint">Confidence: ${esc(r.confidence)}${r.caveat ? ' — ' + esc(r.caveat) : ''}</div>`;
   } catch (e) { out.textContent = e.message; }
+}
+
+
+async function loadAlpha(symbol) {
+  const el = $('#co-alpha');
+  if (!el) return;
+  try {
+    const r = await api(`/api/alpha/${encodeURIComponent(symbol)}`);
+    if (!r.factors || !r.factors.length) { el.innerHTML = '<div class="scorecard"><div class="t">NO FACTORS</div><div class="d hint">Not enough price history.</div></div>'; return; }
+    const fmt = (v) => v === null ? '—' : (Math.abs(v) >= 1000 ? v.toLocaleString(undefined, { maximumFractionDigits: 0 }) : v.toFixed(4));
+    el.innerHTML =
+      `<div class="scorecard"><div class="t">FACTOR SET · ${r.factors.length}</div>
+        <div class="d hint">${esc(r.note)}</div>
+        <div class="d hint">${esc(Object.entries(r.byGroup).map(([k, v]) => `${k} ${v}`).join(' · '))}</div></div>`
+      + `<div class="scorecard"><div class="t">STRONGEST READINGS</div>`
+      + r.strongest.map((f) => `<div class="d">${esc(f.name)} <b>${esc(fmt(f.value))}</b> <span class="hint">${esc(f.note.slice(0, 44))}</span></div>`).join('')
+      + `</div>`;
+  } catch { el.innerHTML = ''; }
 }
 
 async function loadGraph(symbol) {

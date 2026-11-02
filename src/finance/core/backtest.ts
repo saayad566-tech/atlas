@@ -38,6 +38,7 @@ export interface BacktestResult {
     cagrPct: number | null;
     maxDrawdownPct: number;
     sharpe: number | null;
+    informationRatio: number | null;
     rebalances: number;
     averageTurnoverPct: number;
     costPaidPct: number;
@@ -78,7 +79,7 @@ export function backtest(series: PriceSeries[], opts: BacktestOptions = {}): Bac
   ];
   const empty: BacktestResult = {
     ok: false, reason: '', universe: series.length, sessions: 0, from: '', to: '',
-    equity: [], stats: { totalReturnPct: 0, benchmarkReturnPct: 0, cagrPct: null, maxDrawdownPct: 0, sharpe: null, rebalances: 0, averageTurnoverPct: 0, costPaidPct: 0 },
+    equity: [], stats: { totalReturnPct: 0, benchmarkReturnPct: 0, cagrPct: null, maxDrawdownPct: 0, informationRatio: null,  sharpe: null, rebalances: 0, averageTurnoverPct: 0, costPaidPct: 0 },
     assumptions,
   };
   if (series.length === 0) return { ...empty, reason: 'No price history stored.' };
@@ -175,6 +176,25 @@ export function backtest(series: PriceSeries[], opts: BacktestOptions = {}): Bac
     if (sd > 0) sharpe = r2((mean / sd) * Math.sqrt(252));
   }
 
+  // Information ratio: average excess return per unit of tracking error, annualised.
+  // This is the standard measure of whether a strategy beat its benchmark consistently
+  // rather than by luck.
+  let informationRatio: number | null = null;
+  {
+    const excess: number[] = [];
+    for (let i = 1; i < equity.length; i++) {
+      const a = equity[i - 1]!.strategy; const b = equity[i]!.strategy;
+      const ba = equity[i - 1]!.benchmark; const bb = equity[i]!.benchmark;
+      if (a > 0 && ba > 0) excess.push((b - a) / a - (bb - ba) / ba);
+    }
+    if (excess.length > 2) {
+      const mean = excess.reduce((x, y) => x + y, 0) / excess.length;
+      const varr = excess.reduce((x, y) => x + (y - mean) ** 2, 0) / excess.length;
+      const sd = Math.sqrt(varr);
+      if (sd > 0) informationRatio = r2((mean / sd) * Math.sqrt(252));
+    }
+  }
+
   return {
     ok: true, reason: '', universe: series.length, sessions,
     from: equity[0]!.date, to: equity[equity.length - 1]!.date,
@@ -183,6 +203,7 @@ export function backtest(series: PriceSeries[], opts: BacktestOptions = {}): Bac
       totalReturnPct, benchmarkReturnPct, cagrPct,
       maxDrawdownPct: r2(maxDd * 100),
       sharpe,
+      informationRatio,
       rebalances,
       averageTurnoverPct: rebalances ? r2((turnoverSum / rebalances) * 100) : 0,
       costPaidPct: r2(costPaid),

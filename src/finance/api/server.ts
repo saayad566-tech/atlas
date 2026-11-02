@@ -61,6 +61,8 @@ import { ADVISORS, advisorsFor, findAdvisor, runMethod, libraryCoverage, methodE
 import { priceHistory, dataCoverage, type Interval } from '../core/pricehistory';
 import { marketNews, persistNews, storedNews, newsCoverage } from '../core/newsroom';
 import { sessionFor, allSessions } from '../core/session';
+import { summarise, alphaFactors } from '../core/alpha';
+import type { Bar as AlphaBar } from '../core/alpha';
 import { listStrategies, saveStrategy, deleteStrategy, recordStrategyResult, compileConditions } from '../core/strategy';
 import { registrySummary, sourcesFor, SOURCE_REGISTRY } from '../core/sourceRegistry';
 import { SourcePool, runWithFailover } from '../core/failover';
@@ -1479,6 +1481,17 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       // ---- back data: browse any stored date range ----
       // ---- newsroom: per-country market news, cached for offline reading ----
       // ---- trading sessions ----
+      // ---- alpha factors: statistical features from stored prices ----
+      if (p.startsWith('/api/alpha/')) {
+        const sym = decodeURIComponent(p.slice('/api/alpha/'.length));
+        const c = db.db.prepare(`SELECT id FROM companies WHERE UPPER(symbol)=UPPER(?)`).get(sym) as { id: number } | undefined;
+        if (!c) return json(res, 404, { error: 'No such company in this market' });
+        const bars = db.db.prepare(`SELECT date, COALESCE(open,close) AS open, COALESCE(high,close) AS high,
+            COALESCE(low,close) AS low, close, COALESCE(volume,0) AS volume
+          FROM price_history WHERE company_id=? AND close>0 ORDER BY date ASC`).all(c.id) as AlphaBar[];
+        const s = summarise(sym, bars);
+        return json(res, 200, s);
+      }
       if (p === '/api/session') {
         return json(res, 200, { sessions: allSessions(), note: 'Exchange holidays are not modelled; weekends and daily hours are.' });
       }
