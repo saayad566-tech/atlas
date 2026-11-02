@@ -67,6 +67,7 @@ import { resolve, resolveOrExplain, storageKey } from '../core/resolve';
 import { countryMarkets } from '../core/markets';
 import { analyseInstrument } from '../core/instrument';
 import { seedFromBundle } from '../core/directory';
+import { reconcile, listings, listingSummary, markUpcoming, recentlyAdded, type ListingState } from '../core/listings';
 import { perf } from '../core/perf';
 import { SyncEngine } from '../core/sync';
 import { Tenants, type Scope } from '../core/tenants';
@@ -1518,6 +1519,35 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       // ---- newsroom: per-country market news, cached for offline reading ----
       // ---- trading sessions ----
       // ---- alpha factors: statistical features from stored prices ----
+      // ---- instrument lifecycle: new, upcoming, delisted ----
+      if (p === '/api/listings') {
+        const code = markets.active() ?? '';
+        if (!code) return json(res, 400, { error: 'No market selected.' });
+        const state = url.searchParams.get('state') as ListingState | null;
+        const limit = Math.min(Math.max(Number(url.searchParams.get('limit') ?? 100), 1), 500);
+        return json(res, 200, {
+          market: code,
+          summary: listingSummary(db.db, code),
+          recentlyAdded: recentlyAdded(db.db, code, Number(url.searchParams.get('days') ?? 30), 20),
+          items: listings(db.db, code, state ?? undefined, limit),
+          note: 'State is a delta against the stored snapshot, so it works offline. A delisted instrument is kept, never deleted.',
+        });
+      }
+      if (p === '/api/listings/reconcile' && req.method === 'POST') {
+        const code = markets.active() ?? '';
+        if (!code) return json(res, 400, { error: 'No market selected.' });
+        const r = reconcile(db.db, code);
+        return json(res, 200, { ...r, note: 'Compared the stored snapshot with the bundled universe.' });
+      }
+      if (p === '/api/listings/upcoming' && req.method === 'POST') {
+        const b = (await readBody(req)) as { symbol?: string; name?: string; note?: string };
+        const code = markets.active() ?? '';
+        if (!code) return json(res, 400, { error: 'No market selected.' });
+        if (!b.symbol) return json(res, 400, { error: 'Provide a symbol' });
+        markUpcoming(db.db, code, String(b.symbol), String(b.name ?? b.symbol), String(b.note ?? 'announced, not yet trading'));
+        return json(res, 200, { ok: true, symbol: b.symbol, market: code });
+      }
+
       // ---- performance: latency, throughput, alerts ----
       if (p === '/api/perf') return json(res, 200, perf.snapshot());
       if (p === '/api/perf/thresholds' && req.method === 'POST') {

@@ -112,6 +112,32 @@ async function focusInstrument(symbol) {
 }
 
 // ---- trading session badge -------------------------------------------------
+
+async function loadListings() {
+  const el = $('#listings-panel');
+  if (!el) return;
+  try {
+    const r = await api('/api/listings?limit=12');
+    const s = r.summary || {};
+    el.innerHTML =
+      `<div class="scorecard"><div class="t">SNAPSHOT · ${esc(r.market)}</div>
+        <div class="d big">${(s.active + s.new).toLocaleString()}</div>
+        <div class="d hint">listed instruments tracked</div></div>`
+      + `<div class="scorecard"><div class="t">NEW</div><div class="d big">${s.new ?? 0}</div>
+        <div class="d hint">appeared since the last check</div></div>`
+      + `<div class="scorecard"><div class="t">UPCOMING</div><div class="d big">${s.upcoming ?? 0}</div>
+        <div class="d hint">announced, not yet trading</div></div>`
+      + `<div class="scorecard"><div class="t">DELISTED</div><div class="d big">${s.delisted ?? 0}</div>
+        <div class="d hint">kept for history, never deleted</div></div>`
+      + ((r.recentlyAdded || []).length
+        ? `<div class="scorecard" style="grid-column: span 2"><div class="t">RECENTLY APPEARED</div>`
+          + r.recentlyAdded.slice(0, 6).map((x) => `<div class="d">${esc(x.symbol)} <span class="hint">${esc(x.name).slice(0, 34)}</span></div>`).join('')
+          + `</div>`
+        : '');
+    el.querySelectorAll('.scorecard').forEach(() => {});
+  } catch { el.innerHTML = ''; }
+}
+
 async function loadSession() {
   const el = $('#session-badge');
   if (!el) return;
