@@ -28,7 +28,7 @@ import { coverageReport, breadth2, sectorRotation, freshness, correlationMatrix,
 import { Security, errorBody } from '../core/security';
 import { atlasScore, explainMatch } from '../core/intel';
 import { MarketManager, MARKETS, marketDef } from '../core/markets';
-import { LocalLlm } from '../core/llm';
+import { LocalLlm, crossCheck } from '../core/llm';
 import { AiStore } from '../core/aistore';
 import { ModelStore, MODEL_CATALOGUE, deviceProfile, recommendModel, detectRuntime, validateGguf, exportConfig, importConfig } from '../core/modelmanager';
 import { portfolioPnl, dataFreshness, sectorCompanies, explainScreen, toCsv, bulkWatchlist, newsCount, topMovers, sectorBreadth, companyTimeline, watchlistCalendar } from '../core/userfeatures';
@@ -1440,6 +1440,23 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       }
       // ---- data truth: what we actually know, and how much to trust it ----
       // ---- graph, storylines, strategy library, condition builder ----
+      // ---- assistant: the local model when it is running, grounded rules otherwise ----
+      if (p.startsWith('/api/assistant/')) {
+        const sym = decodeURIComponent(p.slice('/api/assistant/'.length));
+        const q = url.searchParams.get('q') ?? '';
+        if (!q.trim()) return json(res, 400, { error: 'Provide a question with ?q=' });
+        const exists = db.db.prepare(`SELECT 1 FROM companies WHERE UPPER(symbol)=UPPER(?)`).get(sym);
+        if (!exists) return json(res, 404, { error: 'No such company in this market' });
+        // LocalLlm.answer already builds the fact block, uses the model when present,
+        // falls back to deterministic rules, and cross-checks numbers against the data.
+        const a = await llm.answer(db.db, sym, q);
+        return json(res, 200, {
+          ...a,
+          note: a.source === 'local-model'
+            ? 'Answered by the on-device model, every number checked against stored data.'
+            : 'No local model is running, so the answer comes from stored numbers using rules. Nothing was invented.',
+        });
+      }
       // ---- ask: answer a question from stored data ----
       // ---- investor library: documented methods, runnable as screens ----
       // ---- back data: browse any stored date range ----

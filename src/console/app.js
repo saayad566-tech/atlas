@@ -64,6 +64,19 @@ function hideNetBanner() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+
+/** The active market, from the server. Never guess a default — guessing is how one
+ *  market's data leaks into another's view. */
+function activeMarket() {
+  return state.market || document.body.dataset.market || null;
+}
+
+/** Build a query string only when we actually know the market; otherwise let the server decide. */
+function marketParam(key = 'market') {
+  const m = activeMarket();
+  return m ? `&${key}=${encodeURIComponent(m)}` : '';
+}
+
 async function api(path, opts) {
   const tok = authToken();
   const headers = { 'Content-Type': 'application/json', ...(tok ? { authorization: `Bearer ${tok}` } : {}), ...(opts && opts.headers ? opts.headers : {}) };
@@ -1254,7 +1267,7 @@ function initExtraControls() {
   };
   if ($('#btn-empty-dir')) $('#btn-empty-dir').onclick = async () => {
     const msg = $('#empty-msg'); if (msg) msg.textContent = 'Syncing directory — this takes a minute…';
-    try { const r = await api('/api/directory/sync/' + (state.market || 'IN'), { method: 'POST', body: '{}' }); if (msg) msg.textContent = `${r.symbols} symbols listed. Use Enrich to load their data.`; }
+    try { const r = await api('/api/directory/sync/' + (activeMarket() || ''), { method: 'POST', body: '{}' }); if (msg) msg.textContent = `${r.symbols} symbols listed. Use Enrich to load their data.`; }
     catch (e) { if (msg) msg.textContent = e.message; }
   };
   if ($('#btn-empty-fetch')) $('#btn-empty-fetch').onclick = async () => {
@@ -1266,7 +1279,7 @@ function initExtraControls() {
   if ($('#btn-dir-sync')) $('#btn-dir-sync').onclick = async () => {
     const msg = $('#dir-msg');
     if (msg) msg.textContent = 'Syncing… this can take a minute';
-    try { const r = await api('/api/directory/sync/' + (state.market || 'IN'), { method: 'POST', body: '{}' }); if (msg) msg.textContent = `${r.symbols} symbols in ${Math.round(r.ms / 1000)}s`; loadDirectory($('#dir-q').value.trim()); }
+    try { const r = await api('/api/directory/sync/' + (activeMarket() || ''), { method: 'POST', body: '{}' }); if (msg) msg.textContent = `${r.symbols} symbols in ${Math.round(r.ms / 1000)}s`; loadDirectory($('#dir-q').value.trim()); }
     catch (e) { if (msg) msg.textContent = e.message; }
   };
   // Boot-time loaders can run before the API base is resolved; retry once it is.
@@ -1716,7 +1729,7 @@ async function loadNewsroom() {
   const el = $('#newsroom-panel');
   if (!el) return;
   try {
-    const r = await api(`/api/newsroom?market=${encodeURIComponent(state.market || 'IN')}&limit=8`);
+    const r = await api(`/api/newsroom?limit=8${marketParam()}`);
     const when = (d) => { const t = new Date(d); return Number.isNaN(t.getTime()) ? '' : t.toLocaleString(); };
     el.innerHTML = r.items.length
       ? r.items.map((n) => `<div class="scorecard"><div class="t">${esc(n.title.slice(0, 90))}</div>
@@ -1734,7 +1747,7 @@ async function loadAdvisors() {
   const el = $('#advisors-panel');
   if (!el) return;
   try {
-    const r = await api(`/api/advisors?country=${encodeURIComponent(state.market || 'IN')}`);
+    const r = await api(`/api/advisors?${(activeMarket() ? `country=${encodeURIComponent(activeMarket())}` : '')}`);
     el.innerHTML = r.advisors.map((a) => `<div class="scorecard">
         <div class="t">${esc(a.name)} <span class="hint">${esc(a.country)} · ${esc(a.era)}</span></div>
         <div class="d">${esc(a.approach)}</div>
@@ -2658,7 +2671,14 @@ function wire() {
   $('#btn-news').onclick = async () => { const s = state.company && state.company.company ? state.company.company.symbol : null; if (!s) return; try { const r = await api(`/api/import/news/${encodeURIComponent(s)}`, { method: 'POST', body: '{}' }); loadNews(s); alert(`Stored ${r.stored} headline(s) from ${r.sources.join(', ') || 'no reachable feed'}`); } catch (e) { alert(e.message); } };
   $('#btn-csv-rich').onclick = () => window.open(`${FIN}/api/export/enriched.csv?expression=${encodeURIComponent($('#expr').value || 'Market Cap > 0')}`, '_blank');
   $('#btn-save-screen').onclick = async () => { const name = prompt('Name this screen:'); if (!name) return; try { await api('/api/saved-screens', { method: 'POST', body: JSON.stringify({ name, expression: $('#expr').value }) }); loadSavedScreens(); } catch (e) { alert(e.message); } };
-  void bootSetup().then((ready) => { if (ready) { loadSavedScreens(); loadSectors(); loadFields(); loadMarkets(); loadHealth(); } });
+  void (async () => {
+  try {
+    const mk = await api('/api/markets');
+    const active = mk.active || (mk.markets || []).find((m) => m.active)?.code || null;
+    if (active) { state.market = active; document.body.dataset.market = active; }
+  } catch { /* the market is unknown; server defaults apply */ }
+})();
+void bootSetup().then((ready) => { if (ready) { loadSavedScreens(); loadSectors(); loadFields(); loadMarkets(); loadHealth(); } });
   if (false) loadSavedScreens();
   loadSectors();
   loadMarkets();
