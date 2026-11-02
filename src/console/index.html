@@ -173,6 +173,20 @@
     <div class="cards" id="co-research"></div>
     <div class="section-h">Atlas Score <span class="hint">one number, every reason behind it</span></div>
     <div class="cards" id="co-atlas"></div>
+    <div class="section-h">Back data <span class="hint">browse the stored record by date</span></div>
+    <div class="briefing" id="backdata-panel">
+      <div class="exprrow">
+        <input class="input" id="bd-from" type="date" aria-label="From date" style="max-width:150px" />
+        <input class="input" id="bd-to" type="date" aria-label="To date" style="max-width:150px" />
+        <select class="input" id="bd-interval" aria-label="Interval" style="max-width:110px">
+          <option value="day">Daily</option><option value="week">Weekly</option><option value="month">Monthly</option>
+        </select>
+        <button class="btn sm primary" id="bd-go">Show</button>
+      </div>
+      <div class="cards" id="bd-stats"></div>
+      <div class="tablewrap" style="max-height:280px;overflow:auto"><table class="dense"><thead><tr><th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Volume</th></tr></thead><tbody id="bd-rows"></tbody></table></div>
+      <div class="hint" id="bd-note"></div>
+    </div>
     <div class="section-h">Ask about this company <span class="hint">on-device model · answers grounded in computed facts</span></div>
     <div class="cards" id="co-ask"></div>
     <div class="section-h">More intelligence <span class="hint">explainer · investability · risk · total return · peers</span></div>

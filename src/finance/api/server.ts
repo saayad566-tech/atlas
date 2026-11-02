@@ -58,6 +58,7 @@ import { companyTruth, marketTruth } from '../core/datatruth';
 import { companyGraph, storylines } from '../core/graph';
 import { ask } from '../core/ask';
 import { ADVISORS, advisorsFor, findAdvisor, runMethod, libraryCoverage, methodExpression } from '../core/advisors';
+import { priceHistory, dataCoverage, type Interval } from '../core/pricehistory';
 import { listStrategies, saveStrategy, deleteStrategy, recordStrategyResult, compileConditions } from '../core/strategy';
 import { registrySummary, sourcesFor, SOURCE_REGISTRY } from '../core/sourceRegistry';
 import { SourcePool, runWithFailover } from '../core/failover';
@@ -1434,6 +1435,20 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       // ---- graph, storylines, strategy library, condition builder ----
       // ---- ask: answer a question from stored data ----
       // ---- investor library: documented methods, runnable as screens ----
+      // ---- back data: browse any stored date range ----
+      if (p === '/api/prices/coverage') {
+        return json(res, 200, dataCoverage(db.db));
+      }
+      if (p.startsWith('/api/prices/')) {
+        const sym = decodeURIComponent(p.slice('/api/prices/'.length));
+        const interval = (url.searchParams.get('interval') ?? 'day') as Interval;
+        const h = priceHistory(db.db, sym, {
+          from: url.searchParams.get('from') ?? undefined,
+          to: url.searchParams.get('to') ?? undefined,
+          interval: ['day', 'week', 'month'].includes(interval) ? interval : 'day',
+        });
+        return h ? json(res, 200, h) : json(res, 404, { error: 'No such company in this market' });
+      }
       if (p === '/api/advisors') {
         const country = url.searchParams.get('country') ?? markets.active() ?? 'IN';
         return json(res, 200, {

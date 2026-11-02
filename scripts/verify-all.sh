@@ -55,6 +55,7 @@ run datatruth verify-datatruth.js
 run graph     verify-graph-strategy.js
 run ask       verify-ask.js
 run advisors  verify-advisors.js
+run backdata  verify-backdata.js
 run provenance verify-provenance.js
 run failover  verify-failover.js
 run adapters  verify-adapters.js

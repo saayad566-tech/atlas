@@ -393,6 +393,8 @@ function renderCompany() {
   loadCorporate(co.symbol);
   loadDataTruth(co.symbol);
   loadGraph(co.symbol);
+  loadBackData(co.symbol);
+  if ($('#bd-go')) { $('#bd-go').onclick = () => loadBackData(co.symbol); }
   if ($('#ask-go')) { $('#ask-go').onclick = () => askCompany(co.symbol); $('#ask-input').onkeydown = (e) => { if (e.key === 'Enter') askCompany(co.symbol); }; }
   loadNote(co.symbol);
   researchPrompt(co.symbol);
@@ -1700,6 +1702,34 @@ async function loadMarketBriefing() {
 
 
 
+
+
+async function loadBackData(symbol) {
+  const rows = $('#bd-rows'); const stats = $('#bd-stats'); const note = $('#bd-note');
+  if (!rows) return;
+  const from = $('#bd-from').value || undefined;
+  const to = $('#bd-to').value || undefined;
+  const interval = $('#bd-interval').value || 'day';
+  const qs = new URLSearchParams();
+  if (from) qs.set('from', from);
+  if (to) qs.set('to', to);
+  qs.set('interval', interval);
+  try {
+    const d = await api(`/api/prices/${encodeURIComponent(symbol)}?${qs.toString()}`);
+    const s = d.stats;
+    stats.innerHTML = [
+      ['Change', s.changePct === null ? '—' : `${s.changePct}%`],
+      ['High', s.high ?? '—'], ['Low', s.low ?? '—'],
+      ['Volatility', s.volatilityPct === null ? '—' : `${s.volatilityPct}%`],
+      ['Best bar', s.bestDayPct === null ? '—' : `${s.bestDayPct}%`],
+      ['Worst bar', s.worstDayPct === null ? '—' : `${s.worstDayPct}%`],
+    ].map(([k, v]) => `<div class="scorecard"><div class="t">${esc(k.toUpperCase())}</div><div class="d big">${esc(String(v))}</div></div>`).join('');
+    rows.innerHTML = d.bars.slice().reverse().slice(0, 200).map((b) => `<tr>
+      <td class="mono">${esc(b.date)}</td><td>${b.open}</td><td>${b.high}</td>
+      <td>${b.low}</td><td>${b.close}</td><td>${b.volume.toLocaleString()}</td></tr>`).join('');
+    if (note) note.textContent = d.note;
+  } catch (e) { if (note) note.textContent = e.message; }
+}
 
 async function askCompany(symbol) {
   const input = $('#ask-input'); const out = $('#ask-answer');
