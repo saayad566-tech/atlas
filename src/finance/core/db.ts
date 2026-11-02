@@ -73,20 +73,22 @@ CREATE TABLE IF NOT EXISTS ratios (
   company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
   period_type TEXT NOT NULL,
   period_end TEXT NOT NULL,
-  roe REAL NOT NULL DEFAULT 0,
-  roce REAL NOT NULL DEFAULT 0,
-  debt_to_equity REAL NOT NULL DEFAULT 0,
-  opm REAL NOT NULL DEFAULT 0,
-  npm REAL NOT NULL DEFAULT 0,
-  pe REAL NOT NULL DEFAULT 0,
-  pb REAL NOT NULL DEFAULT 0,
-  dividend_yield REAL NOT NULL DEFAULT 0,
-  market_cap REAL NOT NULL DEFAULT 0,
-  current_ratio REAL NOT NULL DEFAULT 0,
-  interest_coverage REAL NOT NULL DEFAULT 0,
-  asset_turnover REAL NOT NULL DEFAULT 0,
-  sales_growth_3y REAL NOT NULL DEFAULT 0,
-  profit_growth_3y REAL NOT NULL DEFAULT 0,
+  -- Nullable on purpose: a company with no earnings has no P/E, and storing 0 would make it
+  -- indistinguishable from a genuine zero. Null means "unknown" and reaches the UI as a dash.
+  roe REAL,
+  roce REAL,
+  debt_to_equity REAL,
+  opm REAL,
+  npm REAL,
+  pe REAL,
+  pb REAL,
+  dividend_yield REAL,
+  market_cap REAL,
+  current_ratio REAL,
+  interest_coverage REAL,
+  asset_turnover REAL,
+  sales_growth_3y REAL,
+  profit_growth_3y REAL,
   PRIMARY KEY (company_id, period_type, period_end)
 );
 CREATE INDEX IF NOT EXISTS idx_ratios_company ON ratios(company_id, period_type, period_end DESC);
@@ -137,32 +139,32 @@ CREATE VIEW IF NOT EXISTS v_latest AS SELECT * FROM latest_metrics;
 INSERT INTO latest_metrics
 SELECT
   c.id, c.symbol, c.name, c.sector, c.industry, c.source,
-  COALESCE(q.market_cap, r.market_cap, 0) AS market_cap,
-  COALESCE(q.price, 0) AS price,
-  COALESCE(q.pe, r.pe, 0) AS pe,
-  COALESCE(r.pb, 0) AS pb,
-  COALESCE(r.roe, 0) AS roe,
-  COALESCE(r.roce, 0) AS roce,
-  COALESCE(r.debt_to_equity, 0) AS debt_to_equity,
-  COALESCE(s.sales, 0) AS sales,
-  COALESCE(s.expenses, 0) AS expenses,
-  COALESCE(s.operating_profit, 0) AS operating_profit,
-  COALESCE(s.interest, 0) AS interest,
-  COALESCE(s.depreciation, 0) AS depreciation,
-  COALESCE(s.cfo, 0) AS cfo,
-  COALESCE(s.cash, 0) AS cash,
-  COALESCE(s.net_profit, 0) AS net_profit,
-  COALESCE(r.opm, 0) AS opm,
-  COALESCE(r.npm, 0) AS npm,
-  COALESCE(s.eps, 0) AS eps,
-  COALESCE(r.dividend_yield, 0) AS dividend_yield,
-  COALESCE(sh.promoter, 0) AS promoter_holding,
-  COALESCE(sh.pledge_pct, 0) AS pledge,
-  COALESCE(r.current_ratio, 0) AS current_ratio,
-  COALESCE(r.interest_coverage, 0) AS interest_coverage,
-  COALESCE(r.sales_growth_3y, 0) AS sales_growth_3y,
-  COALESCE(r.profit_growth_3y, 0) AS profit_growth_3y,
-  COALESCE(r.asset_turnover, 0) AS asset_turnover
+  COALESCE(q.market_cap, r.market_cap) AS market_cap,
+  q.price AS price,
+  COALESCE(q.pe, r.pe) AS pe,
+  r.pb AS pb,
+  r.roe AS roe,
+  r.roce AS roce,
+  r.debt_to_equity AS debt_to_equity,
+  s.sales AS sales,
+  s.expenses AS expenses,
+  s.operating_profit AS operating_profit,
+  s.interest AS interest,
+  s.depreciation AS depreciation,
+  s.cfo AS cfo,
+  s.cash AS cash,
+  s.net_profit AS net_profit,
+  r.opm AS opm,
+  r.npm AS npm,
+  s.eps AS eps,
+  r.dividend_yield AS dividend_yield,
+  sh.promoter AS promoter_holding,
+  sh.pledge_pct AS pledge,
+  r.current_ratio AS current_ratio,
+  r.interest_coverage AS interest_coverage,
+  r.sales_growth_3y AS sales_growth_3y,
+  r.profit_growth_3y AS profit_growth_3y,
+  r.asset_turnover AS asset_turnover
 FROM companies c
 LEFT JOIN ratios r ON r.company_id = c.id AND r.period_type = 'annual'
   AND r.period_end = (SELECT MAX(period_end) FROM ratios WHERE company_id = c.id AND period_type = 'annual')
@@ -306,9 +308,41 @@ export function openDatabase(file: string): Db {
   db.pragma('foreign_keys = ON');
   try { db.pragma('mmap_size = 134217728'); } catch { /* not supported everywhere */ }
   db.exec(DDL);
+  migrateRatiosNullable(db);
   applyPerfIndexes(db);
   db.prepare(`INSERT INTO meta(key,value) VALUES('schema_version',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`).run(String(SCHEMA_VERSION));
   return { db, file };
+}
+
+/**
+ * One-time migration: rebuild `ratios` so its columns accept NULL.
+ *
+ * Older databases declared every ratio NOT NULL DEFAULT 0, which made "unknown" and "zero"
+ * the same value — a screen for "P/E under 15" would include a company whose P/E was never
+ * known. SQLite cannot drop a NOT NULL constraint in place, so the table is rebuilt once and
+ * the old one dropped. Zero is preserved as zero: it may be a genuine reading, and silently
+ * turning it into null would destroy real data.
+ */
+function migrateRatiosNullable(db: Database.Database): void {
+  try {
+    const cols = db.prepare(`PRAGMA table_info(ratios)`).all() as Array<{ name: string; notnull: number }>;
+    if (!cols.length) return;
+    if (!cols.some((c) => c.notnull === 1 && !['company_id', 'period_type', 'period_end'].includes(c.name))) return;
+    db.exec('BEGIN');
+    db.exec(`CREATE TABLE ratios_new (
+      company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      period_type TEXT NOT NULL, period_end TEXT NOT NULL,
+      roe REAL, roce REAL, debt_to_equity REAL, opm REAL, npm REAL, pe REAL, pb REAL,
+      dividend_yield REAL, market_cap REAL, current_ratio REAL, interest_coverage REAL,
+      asset_turnover REAL, sales_growth_3y REAL, profit_growth_3y REAL,
+      PRIMARY KEY (company_id, period_type, period_end))`);
+    const names = 'company_id,period_type,period_end,roe,roce,debt_to_equity,opm,npm,pe,pb,dividend_yield,market_cap,current_ratio,interest_coverage,asset_turnover,sales_growth_3y,profit_growth_3y';
+    db.exec(`INSERT INTO ratios_new (${names}) SELECT ${names} FROM ratios`);
+    db.exec('DROP TABLE ratios');
+    db.exec('ALTER TABLE ratios_new RENAME TO ratios');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_ratios_company ON ratios(company_id, period_type, period_end DESC)');
+    db.exec('COMMIT');
+  } catch { try { db.exec('ROLLBACK'); } catch { /* already rolled back */ } }
 }
 
 /**
@@ -328,9 +362,11 @@ export function withWriteRetry<T>(fn: () => T, attempts = 6, baseDelayMs = 25): 
       lastErr = e;
       if (!busy) throw e;
       const wait = baseDelayMs * Math.pow(2, i) + Math.floor(Math.random() * 15);
+      // A short synchronous pause is correct here: SQLite writes are synchronous by nature,
+      // and the budget is under 200 ms. Atomics.sleep would be better but is not available
+      // without a native addon, so this stays a bounded spin rather than a dependency.
       const until = Date.now() + wait;
-      // A deliberate short spin: this is the retry budget, not a background job.
-      while (Date.now() < until) { /* wait out the backoff */ }
+      while (Date.now() < until) { /* bounded retry budget */ }
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));

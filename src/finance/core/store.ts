@@ -1,5 +1,6 @@
 // Read-side queries: search, company detail, screener runs, peers.
 import type { Database as DB } from 'better-sqlite3';
+import { saneNumber } from './sane';
 import { compileExpression } from './expr';
 import type { Company, ScreenerRow } from './types';
 
@@ -24,21 +25,32 @@ const ROW_COLUMNS = `id, symbol, name, sector, industry, source, market_cap, pri
   interest_coverage, sales_growth_3y, profit_growth_3y, asset_turnover, cfo, cash`;
 
 function toRow(r: Record<string, unknown>): ScreenerRow {
+  // Numbers pass the sanity boundary on the way out. Two things are fixed here:
+  //  - an impossible value (1e308, a negative market cap) becomes null, not a lie;
+  //  - a missing value becomes null, not 0. Number(null) is 0, which previously made a
+  //    company with no P/E look like a company trading at zero times earnings, and a
+  //    screen for "P/E < 15" would have included it.
+  const n = (field: string, key: string): number | null => saneNumber(field, r[key]);
   return {
     id: Number(r['id']), symbol: String(r['symbol']), name: String(r['name']),
     sector: String(r['sector']), industry: String(r['industry']),
     // The data's provenance travels with the row so the UI can mark synthetic data.
     source: String(r['source'] ?? ''),
-    marketCap: Number(r['market_cap']), price: Number(r['price']), pe: Number(r['pe']), pb: Number(r['pb']),
-    roe: Number(r['roe']), roce: Number(r['roce']), debtToEquity: Number(r['debt_to_equity']),
-    sales: Number(r['sales']), netProfit: Number(r['net_profit']), opm: Number(r['opm']), npm: Number(r['npm']),
-    eps: Number(r['eps']), dividendYield: Number(r['dividend_yield']), promoterHolding: Number(r['promoter_holding']),
-    pledge: Number(r['pledge']), currentRatio: Number(r['current_ratio']), interestCoverage: Number(r['interest_coverage']),
-    salesGrowth3y: Number(r['sales_growth_3y']), profitGrowth3y: Number(r['profit_growth_3y']),
-    assetTurnover: Number(r['asset_turnover']),
-    cfo: Number(r['cfo']), cash: Number(r['cash']),
+    marketCap: n('market_cap', 'market_cap'), price: saneNumber('price', r['price']),
+    pe: n('pe', 'pe'), pb: n('pb', 'pb'),
+    roe: n('roe', 'roe'), roce: n('roce', 'roce'), debtToEquity: n('debt_to_equity', 'debt_to_equity'),
+    sales: saneNumber('sales', r['sales']), netProfit: saneNumber('net_profit', r['net_profit']),
+    opm: n('opm', 'opm'), npm: n('npm', 'npm'),
+    eps: saneNumber('eps', r['eps']), dividendYield: n('dividend_yield', 'dividend_yield'),
+    promoterHolding: saneNumber('promoter_holding', r['promoter_holding']),
+    pledge: saneNumber('pledge', r['pledge']), currentRatio: n('current_ratio', 'current_ratio'),
+    interestCoverage: n('interest_coverage', 'interest_coverage'),
+    salesGrowth3y: n('sales_growth_3y', 'sales_growth_3y'), profitGrowth3y: n('profit_growth_3y', 'profit_growth_3y'),
+    assetTurnover: n('asset_turnover', 'asset_turnover'),
+    cfo: saneNumber('cfo', r['cfo']), cash: saneNumber('cash', r['cash']),
   };
 }
+
 
 export class Store {
   constructor(private db: DB) {}

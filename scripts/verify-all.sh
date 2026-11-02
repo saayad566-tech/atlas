@@ -71,6 +71,7 @@ run multiasset verify-multasset.js
 run infra     verify-infra.js
 run fullstack verify-fullstack.js
 run listings  verify-listings.js
+run data-q    verify-data-quality.js
 run provenance verify-provenance.js
 run failover  verify-failover.js
 run adapters  verify-adapters.js

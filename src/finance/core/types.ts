@@ -92,8 +92,14 @@ export interface Quote {
 
 /** A row of the screener's flat "latest snapshot" view. */
 export interface ScreenerRow {
-  cfo?: number;
-  cash?: number;
+  /**
+   * Every ratio is nullable because it genuinely can be missing: a company with no earnings
+   * has no P/E, and an impossible value is rejected at the sanity boundary. Declaring these
+   * as `number` would force a lie somewhere — either 0 (which reads as a real reading) or a
+   * cast. Null says "unknown" and the UI can show a dash.
+   */
+  cfo?: number | null;
+  cash?: number | null;
   /** Provenance: 'fixture' means synthetic demo data; anything else is a real source. */
   source?: string;
   id: number;
@@ -101,27 +107,28 @@ export interface ScreenerRow {
   name: string;
   sector: string;
   industry: string;
-  marketCap: number;
-  price: number;
-  pe: number;
-  pb: number;
-  roe: number;
-  roce: number;
-  debtToEquity: number;
-  sales: number;
-  netProfit: number;
-  opm: number;
-  npm: number;
-  eps: number;
-  dividendYield: number;
-  promoterHolding: number;
-  pledge: number;
-  currentRatio: number;
-  interestCoverage: number;
-  salesGrowth3y: number;
-  profitGrowth3y: number;
-  assetTurnover: number;
+  marketCap: number | null;
+  price: number | null;
+  pe: number | null;
+  pb: number | null;
+  roe: number | null;
+  roce: number | null;
+  debtToEquity: number | null;
+  sales: number | null;
+  netProfit: number | null;
+  opm: number | null;
+  npm: number | null;
+  eps: number | null;
+  dividendYield: number | null;
+  promoterHolding: number | null;
+  pledge: number | null;
+  currentRatio: number | null;
+  interestCoverage: number | null;
+  salesGrowth3y: number | null;
+  profitGrowth3y: number | null;
+  assetTurnover: number | null;
 }
+
 
 export interface RedFlag {
   code: string;

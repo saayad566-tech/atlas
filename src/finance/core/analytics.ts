@@ -17,7 +17,8 @@ const r2 = (n: number): number => Math.round(n * 100) / 100;
 
 /** Distribution statistics for the numeric columns of a result set. */
 export function screenStats(rows: ScreenerRow[]): Stats {
-  const cols: Array<[string, (r: ScreenerRow) => number]> = [
+  // A column getter may return null when the value is genuinely missing; the filter below drops those.
+  const cols: Array<[string, (r: ScreenerRow) => number | null]> = [
     ['marketCap', (r) => r.marketCap], ['pe', (r) => r.pe], ['pb', (r) => r.pb], ['roe', (r) => r.roe],
     ['roce', (r) => r.roce], ['debtToEquity', (r) => r.debtToEquity], ['sales', (r) => r.sales],
     ['netProfit', (r) => r.netProfit], ['opm', (r) => r.opm], ['npm', (r) => r.npm],
@@ -26,7 +27,7 @@ export function screenStats(rows: ScreenerRow[]): Stats {
   ];
   const out: Stats = {};
   for (const [key, get] of cols) {
-    const vals = rows.map(get).filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
+    const vals = rows.map(get).filter((v): v is number => v !== null && Number.isFinite(v)).sort((a, b) => a - b);
     if (vals.length === 0) continue;
     out[key] = {
       min: r2(vals[0]!), p25: r2(quantile(vals, 0.25)), median: r2(quantile(vals, 0.5)),
