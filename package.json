@@ -1,6 +1,6 @@
 {
   "name": "atlas",
-  "version": "3.3.3",
+  "version": "3.4.0",
   "private": true,
   "type": "commonjs",
   "description": "Atlas \u2014 a local-first platform for deep fundamental analysis across nine markets",
@@ -88,19 +88,35 @@
     "verify:data-quality": "node scripts/verify-data-quality.js",
     "verify:nulls": "node scripts/verify-null-pipeline.js",
     "verify:robustness": "node scripts/verify-robustness.js",
-    "verify:shapes": "node scripts/verify-shapes.js"
+    "verify:shapes": "node scripts/verify-shapes.js",
+    "build:exe": "npx @yao-pkg/pkg dist/gateway.js --targets node20-win-x64 --output build/atlas.exe",
+    "verify:unproven": "node scripts/verify-unproven.js"
   },
   "dependencies": {
-    "better-sqlite3": "^11.5.0"
+    "better-sqlite3": "^11.5.0",
+    "node-llama-cpp": "^3.22.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^20.14.0",
+    "@yao-pkg/pkg": "^6.14.2",
     "playwright-core": "^1.49.0",
     "typescript": "^5.6.3"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/atlas/atlas"
+  },
+  "pkg": {
+    "scripts": [
+      "dist/**/*.js"
+    ],
+    "assets": [
+      "dist/console/**/*",
+      "src/finance/data/universe/*.json",
+      "src/finance/data/etfs/*.json",
+      "scripts/llama-bridge.mjs"
+    ],
+    "outputPath": "build"
   }
 }

@@ -1,3 +1,5 @@
+import path from 'node:path';
+import fs from 'node:fs';
 // On-device LLM — grounded answers from a LOCAL model only.
 //
 // Three rules this enforces:
@@ -34,6 +36,117 @@ export interface GroundedAnswer {
   verified: boolean;
 }
 
+/**
+ * In-process inference through llama.cpp.
+ *
+ * Loaded lazily and entirely optionally: if `node-llama-cpp` is absent or the model file is
+ * missing, the app reports that honestly and the deterministic answer path takes over. It is
+ * never a hard dependency — Atlas must run on a machine with no model at all.
+ */
+class LlamaRuntime {
+  private child: import('node:child_process').ChildProcessWithoutNullStreams | null = null;
+  private ready = false;
+  private starting: Promise<boolean> | null = null;
+  private pending = new Map<number, (v: { answer?: string; error?: string }) => void>();
+  private nextId = 1;
+  private buffer = '';
+  private modelPath: string | null = null;
+  private loadError: string | null = null;
+
+  constructor() {
+    this.modelPath = process.env['ATLAS_MODEL_PATH'] ?? null;
+  }
+
+  /** True when a model file is configured and present on disk. */
+  configured(): boolean {
+    return !!this.modelPath && fs.existsSync(this.modelPath);
+  }
+
+  get error(): string | null { return this.loadError; }
+
+  /**
+   * Start the inference worker.
+   *
+   * node-llama-cpp is ESM-only and this app is CommonJS, so the model runs in its own
+   * process (scripts/llama-bridge.mjs) and speaks newline-delimited JSON over stdio.
+   * Keeping it alive means the model loads once, not per question.
+   */
+  async ensure(): Promise<boolean> {
+    if (this.ready && this.child) return true;
+    if (this.starting) return this.starting;
+    if (!this.configured()) {
+      this.loadError = this.modelPath ? `model file not found at ${this.modelPath}` : 'no ATLAS_MODEL_PATH set';
+      return false;
+    }
+    this.starting = new Promise<boolean>((resolve) => {
+      void (async () => {
+        try {
+          const { spawn } = await import('node:child_process');
+          const bridge = path.join(__dirname, '..', '..', '..', 'scripts', 'llama-bridge.mjs');
+          if (!fs.existsSync(bridge)) { this.loadError = 'bridge script missing'; return resolve(false); }
+          const child = spawn(process.execPath, [bridge, this.modelPath!], { stdio: ['pipe', 'pipe', 'pipe'] });
+          this.child = child;
+          let settled = false;
+          const done = (ok: boolean): void => { if (!settled) { settled = true; resolve(ok); } };
+
+          child.stdout.setEncoding('utf8');
+          child.stdout.on('data', (chunk: string) => {
+            this.buffer += chunk;
+            let nl: number;
+            while ((nl = this.buffer.indexOf('\n')) !== -1) {
+              const line = this.buffer.slice(0, nl).trim();
+              this.buffer = this.buffer.slice(nl + 1);
+              if (!line) continue;
+              let msg: { ready?: boolean; size?: number; error?: string; id?: number; answer?: string };
+              try { msg = JSON.parse(line) as typeof msg; } catch { continue; }
+              if (msg.ready !== undefined) {
+                this.ready = msg.ready === true;
+                if (!this.ready) this.loadError = msg.error ?? 'model failed to load';
+                return done(this.ready);
+              }
+              if (msg.id !== undefined) {
+                const waiter = this.pending.get(msg.id);
+                if (waiter) { this.pending.delete(msg.id); waiter({ answer: msg.answer, error: msg.error }); }
+              }
+            }
+          });
+          child.stderr.on('data', () => { /* llama.cpp writes load warnings here */ });
+          child.on('exit', () => { this.ready = false; this.child = null; done(false); });
+          setTimeout(() => { if (!settled) { this.loadError = 'model load timed out'; done(false); } }, 120_000);
+        } catch (e) {
+          this.loadError = e instanceof Error ? e.message.slice(0, 200) : 'failed to start';
+          resolve(false);
+        }
+      })();
+    });
+    const ok = await this.starting;
+    this.starting = null;
+    return ok;
+  }
+
+  async chat(question: string, system: string, maxTokens = 160): Promise<string | null> {
+    if (!(await this.ensure()) || !this.child) return null;
+    const id = this.nextId++;
+    const line = JSON.stringify({ id, prompt: question, system, maxTokens }) + '\n';
+    return new Promise<string | null>((resolve) => {
+      const timer = setTimeout(() => { this.pending.delete(id); resolve(null); }, 90_000);
+      this.pending.set(id, (r) => {
+        clearTimeout(timer);
+        if (r.error) { this.loadError = r.error; resolve(null); }
+        else resolve(r.answer && r.answer.trim() ? r.answer.trim() : null);
+      });
+      try { this.child!.stdin.write(line); } catch { clearTimeout(timer); this.pending.delete(id); resolve(null); }
+    });
+  }
+
+  async dispose(): Promise<void> {
+    try { this.child?.kill(); } catch { /* already gone */ }
+    this.child = null; this.ready = false;
+  }
+}
+
+const llamaRuntime = new LlamaRuntime();
+
 export class LocalLlm {
   private modelName: string | null = null;
 
@@ -52,6 +165,14 @@ export class LocalLlm {
   }
 
   async status(): Promise<LlmStatus> {
+    // An in-process model beats an HTTP endpoint: nothing leaves the machine at all.
+    if (llamaRuntime.configured()) {
+      const ready = await llamaRuntime.ensure();
+      return {
+        available: ready, endpoint: 'in-process (llama.cpp)', model: this.modelName ?? 'local GGUF',
+        reason: ready ? 'in-process model ready' : (llamaRuntime.error ?? 'model not loaded'), deviceOnly: true,
+      };
+    }
     try {
       this.assertLocal(this.endpoint);
     } catch (e) {
@@ -73,6 +194,9 @@ export class LocalLlm {
   }
 
   private async generate(prompt: string, system: string): Promise<string | null> {
+    if (llamaRuntime.configured()) {
+      return llamaRuntime.chat(prompt, system);
+    }
     this.assertLocal(this.endpoint);
     try {
       const ctrl = new AbortController();

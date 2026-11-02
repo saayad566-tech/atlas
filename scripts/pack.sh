@@ -9,7 +9,8 @@ mkdir -p "$OUT"
 rm -f "$OUT/atlas-platform.zip" "$OUT/atlas-pwa.zip"
 # Full project: files at the archive root
 zip -rq "$OUT/atlas-platform.zip" . \
-  -x 'node_modules/*' 'data/*' '*.log' '.git/*' '*.tgz' 'screenshot*.png' 'package-lock.json'
+  -x 'node_modules/*' 'data/*' '*.log' '.git/*' '*.tgz' 'screenshot*.png' 'package-lock.json' \
+     'build/*' 'models/*' 'toolchain/*'
 # PWA shell only: directly consumable by PWABuilder / web-to-APK zip upload
 (cd dist/console && zip -rq "$OUT/atlas-pwa.zip" .)
 node scripts/verify-zip.js

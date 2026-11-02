@@ -12,3 +12,4 @@ screenshot*.png
 .env.*
 package-lock.json
 .DS_Store
+build/
