@@ -54,6 +54,7 @@ import { trendingSectors, rankCandidates, peerPercentiles } from '../core/discov
 import { metricHistory, earningsSurprises } from '../core/history';
 import { loadSeries, backtest } from '../core/backtest';
 import { corporateTimeline, insiderFlows } from '../core/corporate';
+import { companyTruth, marketTruth } from '../core/datatruth';
 import { registrySummary, sourcesFor, SOURCE_REGISTRY } from '../core/sourceRegistry';
 import { SourcePool, runWithFailover } from '../core/failover';
 import { listRatios, saveRatio, deleteRatio, applyRatios, validateFormula, allowedFields, RatioError } from '../core/customRatios';
@@ -1424,6 +1425,15 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
         const basic = companyTimeline(db.db, sym);
         return basic ? json(res, 200, { symbol: sym, events: basic, counts: {}, note: 'Basic timeline.' })
                      : json(res, 404, { error: 'No such company' });
+      }
+      // ---- data truth: what we actually know, and how much to trust it ----
+      if (p === '/api/data-truth') {
+        return json(res, 200, marketTruth(db.db, markets.active() ?? 'IN'));
+      }
+      if (p.startsWith('/api/data-truth/')) {
+        const sym = decodeURIComponent(p.slice('/api/data-truth/'.length));
+        const t = companyTruth(db.db, sym);
+        return t ? json(res, 200, t) : json(res, 404, { error: 'No such company in this market' });
       }
       if (p.startsWith('/api/flows/')) {
         const sym = decodeURIComponent(p.slice('/api/flows/'.length));

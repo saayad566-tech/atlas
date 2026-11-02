@@ -391,6 +391,7 @@ function renderCompany() {
   loadCompanyBriefing(co.symbol);
   loadHistory(co.symbol);
   loadCorporate(co.symbol);
+  loadDataTruth(co.symbol);
   loadNote(co.symbol);
   researchPrompt(co.symbol);
   $('#btn-research').onclick = () => loadResearch(co.symbol);
@@ -1665,6 +1666,24 @@ async function loadMarketBriefing() {
 }
 
 
+
+
+async function loadDataTruth(symbol) {
+  const el = $('#co-datatruth');
+  if (!el) return;
+  try {
+    const t = await api(`/api/data-truth/${encodeURIComponent(symbol)}`);
+    const tone = (c) => c === 'present' ? 'var(--ok)' : c === 'partial' ? '#f59e0b' : 'var(--err)';
+    el.innerHTML =
+      `<div class="scorecard"><div class="t">SUPPORT · ${esc(t.verdict.toUpperCase())}</div>
+         <div class="d big">${t.completenessPct}%<span class="hint"> complete</span></div>
+         <div class="d hint">${t.freshnessDays === null ? 'no price data' : `prices ${t.freshnessDays} day(s) old`}</div></div>`
+      + t.types.map((x) => `<div class="scorecard"><div class="t" style="color:${tone(x.coverage)}">${esc(x.label.toUpperCase())}</div>
+           <div class="d">${esc(x.coverage)} · ${x.rows} row(s)</div>
+           <div class="d hint">${esc(x.note)}</div></div>`).join('')
+      + (t.warnings.length ? `<div class="scorecard"><div class="t" style="color:var(--err)">WARNINGS</div>${t.warnings.map((w) => `<div class="d">${esc(w)}</div>`).join('')}</div>` : '');
+  } catch { el.innerHTML = ''; }
+}
 
 async function loadCorporate(symbol) {
   const rows = $('#co-timeline-panel'); const flows = $('#co-flows');
