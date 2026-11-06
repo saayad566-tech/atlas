@@ -2006,6 +2006,35 @@ async function askCompany(symbol) {
 
 
 // ---- The Coffee Rule (Agora Circle) ---------------------------------------
+
+// ---- NSE market board ------------------------------------------------------
+async function loadNseBoard() {
+  const el = $('#nse-board');
+  if (!el) return;
+  try {
+    const r = await api('/api/nse/board');
+    if (!r.indices || !r.indices.length) {
+      el.innerHTML = `<div class="scorecard" style="grid-column: span 2">
+        <div class="t">NSE BOARD</div>
+        <div class="d hint">No board stored yet. <button class="btn sm" id="nse-refresh">Fetch from NSE</button></div></div>`;
+      const b = $('#nse-refresh');
+      if (b) b.onclick = async () => { b.textContent = 'Fetching…'; await api('/api/nse/refresh', { method: 'POST', body: '{}' }); loadNseBoard(); };
+      return;
+    }
+    const top = [...r.indices].sort((x, y) => Math.abs(y.percentChange || 0) - Math.abs(x.percentChange || 0)).slice(0, 8);
+    el.innerHTML =
+      `<div class="scorecard"><div class="t">INDICES</div><div class="d big">${r.indices.length}</div>
+        <div class="d hint">${r.fetchedAt ? new Date(r.fetchedAt).toLocaleString() : ''}</div></div>`
+      + top.map((i) => {
+        const pct = i.percentChange ?? 0;
+        const col = pct > 0 ? 'var(--positive)' : pct < 0 ? 'var(--negative)' : 'var(--ink-3)';
+        return `<div class="scorecard"><div class="t">${esc(i.index)}</div>
+          <div class="d big">${i.last == null ? '—' : nf2.format(i.last)}</div>
+          <div class="d" style="color:${col}">${pct > 0 ? '+' : ''}${pct.toFixed(2)}%</div></div>`;
+      }).join('');
+  } catch { el.innerHTML = ''; }
+}
+
 async function loadCoffee(symbol) {
   const el = $('#co-coffee');
   if (!el) return;

@@ -67,6 +67,7 @@ import { resolve, resolveOrExplain, storageKey } from '../core/resolve';
 import { countryMarkets } from '../core/markets';
 import { analyseInstrument } from '../core/instrument';
 import { coffeeScorecard, SCORECARD_LINES, verdictFor } from '../core/coffee';
+import { fetchNseBoard, fetchNseStatus, storeBoard, storedBoard } from '../core/nse';
 import { gutTest, positionSize, CHECKLIST } from '../core/gut';
 import { downloadModel, progressOf, directUrl } from '../core/modeldownload';
 import { seedFromBundle } from '../core/directory';
@@ -1551,6 +1552,25 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       // ---- back data: browse any stored date range ----
       // ---- newsroom: per-country market news, cached for offline reading ----
       // ---- trading sessions ----
+      // ---- NSE live market board (official exchange data) ----
+      if (p === '/api/nse/board') {
+        const cached = storedBoard(db.db);
+        return json(res, 200, cached ?? { indices: [], source: 'nse', note: 'No board stored yet — call POST /api/nse/refresh' });
+      }
+      if (p === '/api/nse/refresh' && req.method === 'POST') {
+        const r = await fetchNseBoard();
+        if (!r.ok || !r.board) {
+          const cached = storedBoard(db.db);
+          return json(res, 200, { ...(cached ?? { indices: [] }), stale: true, error: r.error,
+            note: 'NSE could not be reached; showing the last stored board.' });
+        }
+        const n = storeBoard(db.db, r.board);
+        return json(res, 200, { ...r.board, stored: n });
+      }
+      if (p === '/api/nse/status') {
+        const r = await fetchNseStatus();
+        return json(res, 200, { rows: r.rows, error: r.error, source: 'nse' });
+      }
       // ---- Agora Circle Coffee Rule scorecard ----
       if (p === '/api/coffee/rules') {
         return json(res, 200, {

@@ -203,7 +203,7 @@ These are recorded because a product document that hides them is not useful.
 
 | # | Limitation | Impact | What would close it |
 |---|---|---|---|
-| 1 | **Live quotes are rate-limited from shared IPs** | Yahoo returns 429; 12 sources registered but only Yahoo is permitted here | a licensed feed, or a residential IP |
+| 1 | **Live quotes are rate-limited from shared IPs** | Yahoo returns 429. An official **NSE adapter** now fetches the index board and market status from the exchange itself (`/api/nse/board`), which is not rate-limited the same way; it degrades to the last stored board when unreachable | a licensed per-symbol feed for non-index quotes |
 | 2 | **Forex carry unimplemented** | no policy-rate source in the free set | add a rates source |
 | 3 | **ETF holdings absent** | no free constituent feed | parse issuer pages, or ship a bundle |
 | 4 | **History depth 4–5 years** | Yahoo's limit, not a code limit | a deeper historical source |
