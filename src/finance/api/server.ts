@@ -66,6 +66,8 @@ import { bundledMarkets, searchUniverse, universeStats, importInto } from '../co
 import { resolve, resolveOrExplain, storageKey } from '../core/resolve';
 import { countryMarkets } from '../core/markets';
 import { analyseInstrument } from '../core/instrument';
+import { coffeeScorecard, SCORECARD_LINES, verdictFor } from '../core/coffee';
+import { gutTest, positionSize, CHECKLIST } from '../core/gut';
 import { downloadModel, progressOf, directUrl } from '../core/modeldownload';
 import { seedFromBundle } from '../core/directory';
 import { reconcile, listings, listingSummary, markUpcoming, recentlyAdded, type ListingState } from '../core/listings';
@@ -1549,6 +1551,51 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       // ---- back data: browse any stored date range ----
       // ---- newsroom: per-country market news, cached for offline reading ----
       // ---- trading sessions ----
+      // ---- Agora Circle Coffee Rule scorecard ----
+      if (p === '/api/coffee/rules') {
+        return json(res, 200, {
+          lines: SCORECARD_LINES,
+          bands: [
+            { min: 8, max: 10, verdict: verdictFor(9).verdict, line: verdictFor(9).line },
+            { min: 5, max: 7, verdict: verdictFor(6).verdict, line: verdictFor(6).line },
+            { min: 0, max: 4, verdict: verdictFor(2).verdict, line: verdictFor(2).line },
+          ],
+          note: 'The Coffee Rule · Fundamental Checklist (Agora Circle). Rules of thumb, not hard rules.',
+        });
+      }
+      if (p.startsWith('/api/coffee/')) {
+        const sym = decodeURIComponent(p.slice('/api/coffee/'.length));
+        const card = coffeeScorecard(db.db, sym);
+        if (!card) return json(res, 404, { error: 'No such company in this market' });
+        return json(res, 200, card);
+      }
+
+      // ---- Agora Circle GUT pre-trade checklist ----
+      if (p === '/api/gut/checklist') {
+        return json(res, 200, { items: CHECKLIST, total: CHECKLIST.length,
+          note: 'Pre Trade Checklist (Agora Circle). Educational only; not investment advice.' });
+      }
+      if (p === '/api/gut/size' && req.method === 'POST') {
+        const b = (await readBody(req)) as { entry?: number; stop?: number; capital?: number; riskPct?: number; maxLossRupees?: number };
+        const r = positionSize(Number(b.entry), Number(b.stop), {
+          ...(b.capital !== undefined ? { capital: Number(b.capital) } : {}),
+          ...(b.riskPct !== undefined ? { riskPct: Number(b.riskPct) } : {}),
+          ...(b.maxLossRupees !== undefined ? { maxLossRupees: Number(b.maxLossRupees) } : {}),
+        });
+        return json(res, 'error' in r ? 400 : 200, r);
+      }
+      if (p === '/api/gut' && req.method === 'POST') {
+        const b = (await readBody(req)) as { reason?: string; maxLossRupees?: number; stopPrice?: number; entryPrice?: number; capital?: number; riskPct?: number; ticks?: string[] };
+        return json(res, 200, gutTest({
+          ...(b.reason !== undefined ? { reason: String(b.reason) } : {}),
+          ...(b.maxLossRupees !== undefined ? { maxLossRupees: Number(b.maxLossRupees) } : {}),
+          ...(b.stopPrice !== undefined ? { stopPrice: Number(b.stopPrice) } : {}),
+          ...(b.entryPrice !== undefined ? { entryPrice: Number(b.entryPrice) } : {}),
+          ...(b.capital !== undefined ? { capital: Number(b.capital) } : {}),
+          ...(b.riskPct !== undefined ? { riskPct: Number(b.riskPct) } : {}),
+          ...(Array.isArray(b.ticks) ? { ticks: b.ticks.map(String) } : {}),
+        }));
+      }
       // ---- alpha factors: statistical features from stored prices ----
       // ---- instrument lifecycle: new, upcoming, delisted ----
       if (p === '/api/listings') {

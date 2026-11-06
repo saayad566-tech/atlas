@@ -1,6 +1,6 @@
 {
   "name": "atlas",
-  "version": "3.4.1",
+  "version": "3.5.0",
   "private": true,
   "type": "commonjs",
   "description": "Local-first multi-asset investment analysis: stocks, ETFs, forex and crypto across nine markets, offline by default.",
@@ -92,7 +92,8 @@
     "build:exe": "npx @yao-pkg/pkg dist/gateway.js --targets node20-win-x64 --output build/atlas.exe",
     "verify:unproven": "node scripts/verify-unproven.js",
     "verify:model-download": "node scripts/verify-model-download.js",
-    "get-model": "bash scripts/get-model.sh"
+    "get-model": "bash scripts/get-model.sh",
+    "verify:coffee": "node scripts/verify-coffee-gut.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.5.0"

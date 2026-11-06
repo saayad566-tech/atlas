@@ -621,6 +621,7 @@ function renderCompany() {
   loadDataTruth(co.symbol);
   loadGraph(co.symbol);
   loadAlpha(co.symbol);
+  loadCoffee(co.symbol);
   loadBackData(co.symbol);
   if ($('#bd-go')) { $('#bd-go').onclick = () => loadBackData(co.symbol); }
   // Ask panel: the grounded answer path, wired to whatever the user types.
@@ -2002,6 +2003,29 @@ async function askCompany(symbol) {
   } catch (e) { out.textContent = e.message; }
 }
 
+
+
+// ---- The Coffee Rule (Agora Circle) ---------------------------------------
+async function loadCoffee(symbol) {
+  const el = $('#co-coffee');
+  if (!el) return;
+  try {
+    const r = await api(`/api/coffee/${encodeURIComponent(symbol)}`);
+    const tone = r.verdict === 'more coffee' ? 'var(--positive)' : r.verdict === 'some foam' ? 'var(--caution)' : 'var(--negative)';
+    const mark = (s) => s === 'pass' ? '<span style="color:var(--positive)">✓</span>'
+      : s === 'fail' ? '<span style="color:var(--negative)">✗</span>'
+      : '<span style="color:var(--ink-3)">?</span>';
+    el.innerHTML =
+      `<div class="scorecard"><div class="t">COFFEE SCORE</div>
+        <div class="d big" style="color:${tone}">${r.score}/${r.outOf}</div>
+        <div class="d" style="color:${tone}">${esc(r.verdictLine)}</div>
+        <div class="d hint">${r.unknown} of ${r.outOf} could not be answered from stored data</div></div>`
+      + r.checks.map((c) => `<div class="scorecard"><div class="t">${mark(c.state)} STEP ${c.step} · ${c.n}</div>
+          <div class="d">${esc(c.label)}</div>
+          <div class="d hint">${esc(c.reading)}</div>
+          <div class="d hint" title="${esc(c.rule)}">${esc(c.rule).slice(0, 60)}</div></div>`).join('');
+  } catch { el.innerHTML = ''; }
+}
 
 async function loadAlpha(symbol) {
   const el = $('#co-alpha');
