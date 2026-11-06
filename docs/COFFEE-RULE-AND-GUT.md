@@ -215,15 +215,33 @@ Entry ₹500, stop loss ₹490, so risk per share is ₹10. Quantity = 5,000 ÷ 
 | 14 checklist items | `CHECKLIST` in `src/finance/core/gut.ts`, in the document's five categories |
 | Quantity formula | `positionSize()`, reproducing the worked example exactly |
 
-### What cannot be implemented from data, and is marked unknown rather than passed
+### How each check is computed
 
-- **The moat** (scorecard line 2) is a judgement about competitive position, not a stored
-  number. Inferring it from margin alone would be a guess.
-- **Explaining the business in two lines** (line 1) is a comprehension test. Atlas can only
-  confirm the business is classified at all.
-- **P/E vs its own history** needs 5–10 years of P/E; the app stores 4–5 years of prices.
-- **Four of the seven red flags** need the annual report: auditor changes, related-party
-  transactions, accounting-policy changes and receivables growth.
+| Line | Basis in the data |
+|---|---|
+| 1 Business in two lines | The app supplies the name, sector and industry; whether you can explain it is your call |
+| 2 Clear moat | Four signals tested against the sector: margin premium, margin stability across years, ROE ≥ 15%, market-cap scale. Two or more firing is treated as evidence |
+| 3 Sales grown steadily | Annual sales, share of years that rose, needing at least three periods |
+| 4 Profits grown with sales | Sales growth against profit growth; growth is required, so both falling fails |
+| 5 ROE / ROCE above 15% | `latest_metrics.roe` and `.roce` |
+| 6 Debt under control | `debt_to_equity` < 1 and `interest_coverage` > 3 |
+| 7 CFO close to net profit | `cfo / net_profit` ≥ 0.8 |
+| 8 Promoters steady, low pledge | `promoter_holding`, `pledge`, and the change across stored shareholding periods |
+| 9 P/E vs history and peers | Monthly price samples against trailing EPS give the company's own median P/E; sector average gives the peer comparison |
+| 10 No major red flags | Five of the seven tested: cash flow below half of profit for three years, receivables growing much faster than sales, equity capital growing (dilution), a rising pledge, and a pledge above 20% |
 
-Every unknown carries a stated reason. The score is out of the checks that could be answered,
-and the note says so plainly.
+### What still cannot be tested from data
+
+Three of the document's seven red flags need the annual report itself, and the check states
+this in its basis line:
+
+- auditor resignation or a qualified opinion
+- related-party transactions with promoter-owned firms
+- repeated changes in accounting policy or year-end
+
+**The moat remains a proxy.** Four signals are a reasonable stand-in for the document's five
+moat types, but they are evidence of a moat, not proof of competitive position. The basis line
+states how many signals fired and says so.
+
+Every unknown carries a stated reason, and the score is out of the checks that could be
+answered.

@@ -57,10 +57,70 @@ ok('it names what is missing', G.gutTest({}).blockedBy.length===3, G.gutTest({})
   ok('it returns all ten checks', card.checks.length===10, `${card.checks.length}`);
   ok('the score equals the passes', card.score===card.checks.filter(c=>c.state==='pass').length);
   ok('unanswered checks are unknown, never passed', card.checks.filter(c=>c.state==='unknown').every(c=>!!c.reason), `${card.unknown} unknown`);
+  ok('Step 5 sources are published', card.sources.length===5, `${card.sources.length}`);
+  ok('the six beginner mistakes are carried', card.mistakes.length===6, `${card.mistakes.length}`);
   ok('every check carries its rule', card.checks.every(c=>c.rule.length>10));
   ok('every check carries a reading', card.checks.every(c=>c.reading.length>0));
   ok('the verdict matches the band', card.verdictLine===C.verdictFor(card.score).line, card.verdictLine);
   ok('the disclaimer is present', /not investment advice|Educational/i.test(card.note));
+
+  console.log('\n=== THE FOUR PREVIOUSLY-UNKNOWN CHECKS NOW COMPUTE ===');
+  const moat=card.checks.find(c=>c.n===2);
+  ok('2. moat is assessed from signals', moat.reading.length>10 && !/not derivable/.test(moat.reading), moat.reading.slice(0,60));
+  ok('   and states its basis', !!moat.basis && /signals fired/.test(moat.basis));
+  const pe=card.checks.find(c=>c.n===9);
+  ok('9. P/E is compared to its own history', /median/.test(pe.reading), pe.reading.slice(0,70));
+  const flags=card.checks.find(c=>c.n===10);
+  ok('10. red flags are tested, not assumed', /Tested:/.test(flags.basis||''), (flags.basis||'').slice(0,70));
+  ok('    and names what still needs the annual report', /auditor|related-party|accounting/.test(flags.basis||''));
+  ok('1. the business description is supplied', card.checks[0].reading.length>5, card.checks[0].reading.slice(0,40));
+
+  console.log('\n=== RECEIVABLES, DILUTION AND PLEDGE ARE DETECTED ===');
+  // A purpose-built database with known values, so the detection is tested precisely
+  // rather than by mutating a fixture and hoping the rows line up.
+  const { openDatabase }=require('../dist/finance/core/db');
+  const craft=openDatabase(path.join(fs.mkdtempSync(path.join(os.tmpdir(),'craft-')),'c.db'));
+  craft.db.exec(`INSERT INTO companies (id,symbol,name,sector,industry,currency,source,listed_on,updated_at)
+    VALUES (1,'TEST.NS','Test Ltd','Industrials','','INR','test','2020-01-01','2026-01-01')`);
+  craft.db.exec(`INSERT INTO latest_metrics (id,symbol,name,sector,industry,source,market_cap,price,pe,roe,roce,
+    debt_to_equity,sales,net_profit,cfo,opm,eps,promoter_holding,pledge,interest_coverage)
+    VALUES (1,'TEST.NS','Test Ltd','Industrials','','test',1000000,100,20,18,18,0.3,1000,100,110,20,5,55,0,8)`);
+  // receivables balloon, equity capital doubles, pledge rises
+  const stmt=`INSERT INTO statements (company_id,period_type,period_end,fiscal_year,sales,net_profit,cfo,receivables,equity_capital,opm_pct)
+    VALUES (1,'annual',?,?,?,?,?,?,?,?)`;
+  craft.db.prepare(stmt).run('2026-03-31',2026,1000,100,110,500,200,20);
+  craft.db.prepare(stmt).run('2025-03-31',2025,950,95,105,200,150,20);
+  craft.db.prepare(stmt).run('2024-03-31',2024,900,90,100,100,100,20);
+  craft.db.prepare(`INSERT INTO shareholding (company_id,period_end,promoter,fii,dii,public,pledge_pct)
+    VALUES (1,'2026-03-31',55,10,10,25,25)`).run();
+  craft.db.prepare(`INSERT INTO shareholding (company_id,period_end,promoter,fii,dii,public,pledge_pct)
+    VALUES (1,'2025-03-31',55,10,10,25,5)`).run();
+  const dirty=C.coffeeScorecard(craft.db,'TEST.NS');
+  const f=dirty.checks.find(c=>c.n===10);
+  ok('a receivables blow-out is flagged', /receivables grew/.test(f.reading), f.reading.slice(0,80));
+  ok('share issuance is flagged', /equity capital grew/.test(f.reading), f.reading.slice(0,80));
+  ok('a rising pledge is flagged', /pledge rose/.test(f.reading));
+  ok('the red-flag line then fails', f.state==='fail');
+  ok('it names what it tested', /Tested:/.test(f.basis||''));
+
+  console.log('\n=== A CLEAN COMPANY PASSES THE SAME TESTS ===');
+  const clean=openDatabase(path.join(fs.mkdtempSync(path.join(os.tmpdir(),'clean-')),'c.db'));
+  clean.db.exec(`INSERT INTO companies (id,symbol,name,sector,industry,currency,source,listed_on,updated_at)
+    VALUES (1,'GOOD.NS','Good Ltd','Industrials','','INR','test','2020-01-01','2026-01-01')`);
+  clean.db.exec(`INSERT INTO latest_metrics (id,symbol,name,sector,industry,source,market_cap,price,pe,roe,roce,
+    debt_to_equity,sales,net_profit,cfo,opm,eps,promoter_holding,pledge,interest_coverage)
+    VALUES (1,'GOOD.NS','Good Ltd','Industrials','','test',1000000,100,18,20,20,0.2,1000,100,105,20,5,55,0,10)`);
+  const s2=`INSERT INTO statements (company_id,period_type,period_end,fiscal_year,sales,net_profit,cfo,receivables,equity_capital,opm_pct)
+    VALUES (1,'annual',?,?,?,?,?,?,?,?)`;
+  clean.db.prepare(s2).run('2026-03-31',2026,1000,100,105,100,100,20);
+  clean.db.prepare(s2).run('2025-03-31',2025,900,90,95,95,100,20);
+  clean.db.prepare(s2).run('2024-03-31',2024,800,80,85,85,100,20);
+  clean.db.prepare(`INSERT INTO shareholding (company_id,period_end,promoter,fii,dii,public,pledge_pct)
+    VALUES (1,'2026-03-31',55,10,10,25,0)`).run();
+  const good=C.coffeeScorecard(clean.db,'GOOD.NS');
+  const gf=good.checks.find(c=>c.n===10);
+  ok('a clean company passes the red-flag line', gf.state==='pass', gf.reading);
+  ok('and scores higher than the dirty one', good.score>dirty.score, `${dirty.score} vs ${good.score}`);
 
   console.log('\n=== A KNOWN-GOOD COMPANY SCORES HIGHER ===');
   const db=openDatabase(path.join(home,'markets','IN-STOCK.db'));

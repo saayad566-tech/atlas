@@ -1,6 +1,6 @@
 {
   "name": "atlas",
-  "version": "3.5.0",
+  "version": "3.5.1",
   "private": true,
   "type": "commonjs",
   "description": "Local-first multi-asset investment analysis: stocks, ETFs, forex and crypto across nine markets, offline by default.",
