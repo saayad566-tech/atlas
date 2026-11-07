@@ -119,7 +119,15 @@ export function ask(db: DB, symbol: string, question: string): Answer | null {
     }
     case 'buy': {
       return base({
-        answer: `${name} looks ${stances.filter((s) => s.score >= 65).map((s) => s.verdict).join(' and ') || 'unremarkable'}, with ${stances.filter((s) => s.score <= 35).map((s) => s.verdict).join(' and ') || 'no obvious weakness'}.${dissent.length ? ' ' + dissent[0]!.message : ''}`,
+        answer: (() => {
+          const strong = stances.filter((s) => s.score >= 65).map((s) => s.verdict);
+          const weak = stances.filter((s) => s.score <= 35).map((s) => s.verdict);
+          const good = strong.length ? strong.join(' and ') : 'unremarkable';
+          const bad = weak.length ? weak.join(' and ') : '';
+          // "with expensive" reads as a mistake; name the dimension instead.
+          const tail = bad ? `, but ${bad} on the numbers` : ', with no obvious weakness';
+          return `${name} looks ${good}${tail}.${dissent.length ? ' ' + dissent[0]!.message : ''}`;
+        })(),
         evidence: stances.map((s) => ev(s.dimension, `${s.score}/100 — ${s.verdict}`)),
         confidence: 'low',
         caveat: 'This is analysis of stored numbers, not investment advice. Position size and your own circumstances are not inputs here.',

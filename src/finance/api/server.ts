@@ -68,6 +68,8 @@ import { countryMarkets } from '../core/markets';
 import { analyseInstrument } from '../core/instrument';
 import { coffeeScorecard, SCORECARD_LINES, verdictFor } from '../core/coffee';
 import { fetchNseBoard, fetchNseStatus, storeBoard, storedBoard } from '../core/nse';
+import { chatReply, chatGreeting } from '../core/chat';
+import { ingestDocument } from '../core/bookingest';
 import { gutTest, positionSize, CHECKLIST } from '../core/gut';
 import { downloadModel, progressOf, directUrl } from '../core/modeldownload';
 import { seedFromBundle } from '../core/directory';
@@ -1552,6 +1554,46 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       // ---- back data: browse any stored date range ----
       // ---- newsroom: per-country market news, cached for offline reading ----
       // ---- trading sessions ----
+      // ---- chat: the primary surface ----
+      if (p === '/api/chat/greeting') {
+        let n = 0;
+        try { n = (db.db.prepare('SELECT COUNT(*) AS n FROM companies').get() as { n: number }).n; } catch { n = 0; }
+        return json(res, 200, chatGreeting(n));
+      }
+      if (p === '/api/chat' && req.method === 'POST') {
+        const b = (await readBody(req)) as { question?: string; mode?: 'fast' | 'thinking'; symbol?: string };
+        const question = String(b.question ?? '').slice(0, 2000);
+        if (!question.trim()) return json(res, 400, { error: 'Ask a question' });
+        const mode = b.mode === 'thinking' ? 'thinking' : 'fast';
+        const reply = chatReply(db.db, question, {
+          mode,
+          ...(b.symbol ? { symbol: String(b.symbol) } : {}),
+        });
+        // Thinking mode additionally consults the local model when one is installed. The
+        // deterministic answer is never discarded: the model reply is appended and labelled.
+        if (mode === 'thinking' && llm.activeModelId() !== null) {
+          const grounded = await llm.answer(db.db, b.symbol ?? '', question);
+          if (grounded.source === 'local-model' && grounded.answer) {
+            return json(res, 200, {
+              ...reply,
+              text: `${reply.text}\n\n— Local model —\n${grounded.answer}`,
+              engine: 'local-model',
+              evidence: [...reply.evidence, ...grounded.context.slice(0, 4).map((c) => `${c.label}: ${c.value}`)],
+            });
+          }
+        }
+        return json(res, 200, reply);
+      }
+
+      // ---- book ingestion: a document into a runnable screen ----
+      if (p === '/api/ingest/text' && req.method === 'POST') {
+        const b = (await readBody(req)) as { text?: string; title?: string };
+        const text = String(b.text ?? '');
+        if (!text.trim()) return json(res, 400, { error: 'Paste some text to read' });
+        if (text.length > 400_000) return json(res, 413, { error: 'Document too large (limit 400,000 characters)' });
+        const r = ingestDocument(text, String(b.title ?? 'Pasted document'));
+        return json(res, 200, r);
+      }
       // ---- NSE live market board (official exchange data) ----
       if (p === '/api/nse/board') {
         const cached = storedBoard(db.db);

@@ -41,14 +41,10 @@
     <div class="hint" id="lock-msg" role="status"></div>
   </div>
 </div>
-<header class="topbar">
-  <div class="brand"><span class="logo">S</span><span>Sift</span><small>local screener</small></div>
-  <div class="searchwrap">
-    <input id="search" class="search" type="search" placeholder="Search a company or symbol…  ( / )" autocomplete="off" aria-label="Search companies" />
-    <div id="hits" class="hits" hidden></div>
-  </div>
+<div class="shell">
   <nav class="nav">
-    <button class="navbtn active" data-view="screener">Screener</button>
+    <button class="navbtn active" data-view="chat">Chat</button>
+    <button class="navbtn" data-view="screener">Screener</button>
     <button class="navbtn" data-view="watchlist">Watchlist</button>
     <button class="navbtn" data-view="rank">Rank</button>
     <button class="navbtn" data-view="portfolio">Portfolio</button>
@@ -62,16 +58,62 @@
     <select id="market-select" class="input sm" aria-label="Market" title="Download and switch country bundles"></select>
     <button class="navbtn" data-view="compare">Compare</button>
     <button class="navbtn" data-view="store">AI Store</button>
+    <button class="navbtn" data-view="library">Library</button>
     <button class="navbtn" data-view="import">Import</button>
   </nav>
+
+<div class="main">
+<header class="topbar">
+  <div class="brand"><span class="logo">S</span><span>Sift</span><small>local screener</small></div>
+  <div class="searchwrap">
+    <input id="search" class="search" type="search" placeholder="Search a company or symbol…  ( / )" autocomplete="off" aria-label="Search companies" />
+    <div id="hits" class="hits" hidden></div>
+  </div>
   <div class="spacer"></div>
   <button class="btn sm ghost" id="btn-theme" title="Toggle theme" aria-label="Toggle theme">◐</button>
   <span class="chip" id="dataset-chip" title="Where the data comes from">…</span>
 </header>
 
-<main class="main">
+<main class="content">
   <!-- Screener -->
-  <section id="view-screener" class="view active">
+  <section id="view-chat" class="view active chatview">
+    <div class="chatwrap">
+      <div class="chatlog" id="chat-log" aria-live="polite"></div>
+      <div class="chatcompose">
+        <div class="chattools">
+          <div class="segmented" role="group" aria-label="Answer mode">
+            <button class="segbtn active" data-mode="fast" title="Answer from stored data and the built-in reference">Fast</button>
+            <button class="segbtn" data-mode="thinking" title="Also consult the local model when one is installed">Thinking</button>
+          </div>
+          <span class="hint" id="chat-engine">Ready</span>
+        </div>
+        <div class="chatrow">
+          <textarea id="chat-input" class="chatinput" rows="1" placeholder="Ask about a company, the market, or any term…" aria-label="Your question"></textarea>
+          <button class="btn primary" id="chat-send" aria-label="Send">Send</button>
+        </div>
+        <div class="hint chatsmall">Everything runs on this device. Atlas will not invent a number it cannot trace.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-library" class="view">
+    <div class="section-h">Read a document <span class="hint">paste a chapter or notes — Atlas extracts the rules and builds a screen you can run</span></div>
+    <div class="cards">
+      <div class="scorecard" style="grid-column: span 2">
+        <div class="t">DOCUMENT</div>
+        <input id="ingest-title" class="input sm" placeholder="Title, e.g. Quality Rule" aria-label="Document title" />
+        <textarea id="ingest-text" class="input" rows="10" style="margin-top:8px;width:100%;font-family:var(--mono);font-size:12px"
+          placeholder="Paste the text here.&#10;&#10;Example:&#10;Buy when the P/E is below 20 and the debt to equity is less than 1.&#10;Exit when the operating margin falls below 10 percent."></textarea>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+          <button class="btn primary" id="ingest-run">Read it</button>
+          <span class="hint" id="ingest-status">Nothing pasted yet</span>
+        </div>
+      </div>
+    </div>
+    <div id="ingest-result"></div>
+  </section>
+
+  <section id="view-screener" class="view">
     <div class="querybar">
       <div class="nlrow">
         <input id="nl" class="nl" type="text" placeholder="Describe what you want — e.g. “zero debt, ROE above 20, P/E under 20”" aria-label="Natural language query" />
@@ -452,5 +494,7 @@
       <div class="hint" style="padding:8px 12px">↑↓ to move · Enter to open · Esc to close</div>
     </div>
   </div>
+</div><!-- /.main -->
+</div><!-- /.shell -->
 </body>
 </html>

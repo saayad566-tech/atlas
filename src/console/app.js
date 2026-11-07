@@ -138,6 +138,184 @@ async function loadListings() {
   } catch { el.innerHTML = ''; }
 }
 
+
+// ---- Chat: the primary surface --------------------------------------------
+const chatState = { mode: 'fast', turns: [], busy: false };
+
+function chatEl(id) { return document.getElementById(id); }
+
+function renderTurn(t) {
+  const log = chatEl('chat-log');
+  if (!log) return;
+  const isUser = t.role === 'user';
+  const wrap = document.createElement('div');
+  wrap.className = `msg ${isUser ? 'user' : 'atlas'}`;
+
+  const av = document.createElement('div');
+  av.className = 'avatar';
+  av.textContent = isUser ? 'You' : 'A';
+
+  const bub = document.createElement('div');
+  bub.className = 'bubble';
+  bub.textContent = t.text;
+
+  if (!isUser) {
+    const meta = document.createElement('span');
+    meta.className = 'meta';
+    const label = t.engine === 'local-model' ? 'local model'
+      : t.engine === 'reference' ? 'built-in reference'
+      : t.engine === 'nse' ? 'NSE board'
+      : 'stored data';
+    meta.textContent = `via ${label} · ${t.kind || 'answer'}`;
+    bub.appendChild(meta);
+
+    if (t.evidence && t.evidence.length) {
+      const ev = document.createElement('div');
+      ev.className = 'evidence';
+      t.evidence.slice(0, 6).forEach((e) => {
+        const d = document.createElement('div');
+        d.textContent = e;
+        ev.appendChild(d);
+      });
+      bub.appendChild(ev);
+    }
+    if (t.caveat) {
+      const c = document.createElement('div');
+      c.className = 'caveat';
+      c.textContent = t.caveat;
+      bub.appendChild(c);
+    }
+    if (t.followUps && t.followUps.length) {
+      const f = document.createElement('div');
+      f.className = 'followups';
+      t.followUps.slice(0, 4).forEach((q) => {
+        const b = document.createElement('button');
+        b.textContent = q;
+        b.onclick = () => sendChat(q);
+        f.appendChild(b);
+      });
+      bub.appendChild(f);
+    }
+  }
+
+  wrap.appendChild(av);
+  wrap.appendChild(bub);
+  log.appendChild(wrap);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function sendChat(text) {
+  const input = chatEl('chat-input');
+  const q = (text ?? input?.value ?? '').trim();
+  if (!q || chatState.busy) return;
+  if (input && text === undefined) { input.value = ''; input.style.height = 'auto'; }
+  chatState.busy = true;
+  const send = chatEl('chat-send');
+  if (send) send.disabled = true;
+  renderTurn({ role: 'user', text: q });
+  const eng = chatEl('chat-engine');
+  if (eng) eng.textContent = chatState.mode === 'thinking' ? 'Thinking…' : 'Reading stored data…';
+  try {
+    const r = await api('/api/chat', { method: 'POST', body: JSON.stringify({ question: q, mode: chatState.mode }) });
+    renderTurn({ role: 'atlas', text: r.text, engine: r.engine, kind: r.kind,
+      evidence: r.evidence, caveat: r.caveat, followUps: r.followUps });
+    if (eng) eng.textContent = r.engine === 'local-model' ? 'Answered by the local model'
+      : r.engine === 'reference' ? 'Answered from the reference'
+      : r.engine === 'nse' ? 'Answered from the NSE board'
+      : 'Answered from stored data';
+  } catch (e) {
+    renderTurn({ role: 'atlas', text: 'I could not reach the local service. ' + (e && e.message ? e.message : ''),
+      engine: 'deterministic', kind: 'error' });
+    if (eng) eng.textContent = 'Error';
+  } finally {
+    chatState.busy = false;
+    if (send) send.disabled = false;
+    input?.focus();
+  }
+}
+
+async function initChat() {
+  const input = chatEl('chat-input');
+  const send = chatEl('chat-send');
+  if (!input || !send) return;
+  if (chatState.turns.length) return;
+  chatState.turns.push('ready');
+
+  try {
+    const g = await api('/api/chat/greeting');
+    renderTurn({ role: 'atlas', text: g.text, engine: g.engine, kind: 'ready', followUps: g.followUps });
+  } catch { /* the empty state explains itself */ }
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  });
+  // The composer grows with the text, up to a limit.
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+  });
+  document.querySelectorAll('.segbtn[data-mode]').forEach((b) => {
+    b.onclick = () => {
+      document.querySelectorAll('.segbtn[data-mode]').forEach((x) => x.classList.remove('active'));
+      b.classList.add('active');
+      chatState.mode = b.dataset.mode;
+    };
+  });
+}
+
+// ---- Library: a document into a runnable screen ----------------------------
+async function runIngest() {
+  const run = chatEl('ingest-run');
+  const text = chatEl('ingest-text')?.value ?? '';
+  const title = chatEl('ingest-title')?.value || 'Pasted document';
+  const status = chatEl('ingest-status');
+  if (!text.trim()) { if (status) status.textContent = 'Paste some text first'; return; }
+  if (run) run.disabled = true;
+  if (status) status.textContent = 'Reading…';
+  try {
+    const r = await api('/api/ingest/text', { method: 'POST', body: JSON.stringify({ text, title }) });
+    if (status) status.textContent = `${r.rules.length} rules · ${r.omissions} not expressible`;
+    renderIngest(r);
+  } catch (e) {
+    if (status) status.textContent = 'Failed: ' + (e && e.message ? e.message : 'unknown');
+  } finally { if (run) run.disabled = false; }
+}
+
+function initLibrary() { /* the button is bound in wire(); nothing else to set up */ }
+
+function renderIngest(r) {
+  const el = chatEl('ingest-result');
+  if (!el) return;
+  const kindColor = (k) => k === 'entry' ? 'var(--positive)' : k === 'exit' ? 'var(--negative)'
+    : k === 'risk' ? 'var(--caution)' : 'var(--ink-3)';
+  el.innerHTML =
+    `<div class="section-h">What was found</div>`
+    + `<div class="cards"><div class="scorecard"><div class="t">RULES</div><div class="d big">${r.rules.length}</div>
+        <div class="d hint">${r.sentences} sentences · ${r.sections} sections</div></div>
+      <div class="scorecard"><div class="t">NOT EXPRESSIBLE</div><div class="d big">${r.omissions}</div>
+        <div class="d hint">listed with their source, never approximated</div></div>
+      ${r.screen ? `<div class="scorecard"><div class="t">SCREEN BUILT</div>
+        <div class="d mono" style="font-size:12px">${esc(r.screen.expression || r.screen.reason || '')}</div>
+        ${r.screen.runs ? `<div class="d"><button class="btn sm" id="ingest-apply">Run this screen</button></div>` : ''}</div>` : ''}
+      </div>`
+    + `<div class="section-h">Every rule, with its source</div><div class="cards">`
+    + r.rules.map((x) => `<div class="scorecard"><div class="t" style="color:${kindColor(x.kind)}">${esc(x.kind.toUpperCase())}</div>
+        <div class="d mono" style="font-size:11.5px">${esc(x.expression || '—')}</div>
+        <div class="d hint" style="margin-top:4px">"${esc(x.source.slice(0, 150))}"</div>
+        ${x.omission ? `<div class="d hint" style="color:var(--caution)">${esc(x.omission)}</div>` : ''}
+        <div class="d hint" style="font-size:10px">§ ${esc(x.section)}</div></div>`).join('')
+    + `</div><p class="hint" style="margin-top:12px">${esc(r.note)}</p>`;
+  const apply = chatEl('ingest-apply');
+  if (apply && r.screen?.expression) {
+    apply.onclick = () => {
+      const expr = chatEl('expr');
+      if (expr) expr.value = r.screen.expression;
+      document.querySelector('[data-view="screener"]')?.click();
+      setTimeout(() => chatEl('btn-apply')?.click(), 250);
+    };
+  }
+}
+
 async function loadSession() {
   const el = $('#session-badge');
   if (!el) return;
@@ -677,6 +855,7 @@ async function renderStars(symbol) {
 // ONE map for view routing. It was duplicated and new views kept landing in only one
 // copy, which silently broke three tabs across three rounds.
 const VIEWS = {
+  chat: 'view-chat', library: 'view-library',
   screener: 'view-screener', company: 'view-company', watchlist: 'view-watchlist',
   rank: 'view-rank', portfolio: 'view-portfolio',
   macro: 'view-macro', import: 'view-import', intel: 'view-intel',
@@ -1710,7 +1889,7 @@ function initShortcuts() {
     if (typing) return;
     if (e.key === 'g') { pendingG = true; setTimeout(() => { pendingG = false; }, 900); return; }
     if (pendingG) {
-      const map = { s: 'screener', w: 'watchlist', p: 'portfolio', i: 'intel', c: 'compare', m: 'macro', a: 'store' };
+      const map = { s: 'screener', w: 'watchlist', p: 'portfolio', i: 'intel', c: 'compare', m: 'macro', a: 'store', h: 'chat', l: 'library' };
       const view = map[e.key];
       if (view) { e.preventDefault(); const btn = document.querySelector(`.navbtn[data-view="${view}"]`); if (btn) btn.click(); }
       pendingG = false;
@@ -2804,6 +2983,8 @@ function wire() {
     if (tr) openCompany(tr.dataset.sym);
   });
 
+  $('#chat-send').onclick = () => sendChat();
+  $('#ingest-run').onclick = () => runIngest();
   $('#btn-back').onclick = () => showView('view-screener');
   document.querySelectorAll('.navbtn').forEach((b) => {
     b.onclick = () => {
@@ -2817,6 +2998,8 @@ function wire() {
       if (v === 'intel') { loadIntel(); loadJobs(); loadTools(); loadAdmin(); loadUniverse(); loadMovers(); loadSectorBreadth();  loadSectors(); loadDiscover(); loadAdvisors(); loadNewsroom(); }
       if (v === 'store') { loadStore(); loadModels(); }
       if (v === 'macro') loadMacro();
+    if (v === 'library') initLibrary();
+    if (v === 'chat') setTimeout(() => chatEl('chat-input')?.focus(), 60);
     };
   });
   $('#btn-save-note').onclick = async () => {
@@ -2991,6 +3174,9 @@ async function boot() {
   loadPresets();
   await loadStats();
   await runScreen({ expression: 'Market Cap > 0' });
+  // The chat is the primary surface, so it boots with the app rather than on first click.
+  try { await initChat(); } catch { /* the empty state explains itself */ }
+  try { initLibrary(); } catch { /* wired when the view opens */ }
 }
 
 document.addEventListener('DOMContentLoaded', boot);
