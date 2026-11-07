@@ -157,7 +157,10 @@ function renderTurn(t) {
 
   const bub = document.createElement('div');
   bub.className = 'bubble';
-  bub.textContent = t.text;
+  // Answers are rendered as Markdown; user text stays literal so nothing they type is
+  // interpreted as markup.
+  if (isUser) bub.textContent = t.text;
+  else bub.innerHTML = renderMarkdown(t.text);
 
   if (!isUser) {
     const meta = document.createElement('span');
@@ -202,6 +205,7 @@ function renderTurn(t) {
   wrap.appendChild(bub);
   log.appendChild(wrap);
   log.scrollTop = log.scrollHeight;
+  if (!t.noPersist) persistTurn(t);
 }
 
 async function sendChat(text) {
@@ -241,10 +245,16 @@ async function initChat() {
   if (chatState.turns.length) return;
   chatState.turns.push('ready');
 
-  try {
-    const g = await api('/api/chat/greeting');
-    renderTurn({ role: 'atlas', text: g.text, engine: g.engine, kind: 'ready', followUps: g.followUps });
-  } catch { /* the empty state explains itself */ }
+  // The conversation list renders first, so the sidebar is never empty on load.
+  renderThreadList();
+
+  // Restore the last conversation, or greet a first-time user.
+  const existing = currentThread();
+  if (existing && existing.turns.length) {
+    for (const turn of existing.turns) renderTurn({ ...turn, noPersist: true });
+  } else {
+    await bootChatGreeting();
+  }
 
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
@@ -2984,6 +2994,10 @@ function wire() {
   });
 
   $('#chat-send').onclick = () => sendChat();
+  $('#chat-new').onclick = () => { newThread(); openThread(activeThreadId()); };
+  initDropZone();
+  initVoice();
+  $('#chat-mic').onclick = () => toggleVoice();
   $('#ingest-run').onclick = () => runIngest();
   $('#btn-back').onclick = () => showView('view-screener');
   document.querySelectorAll('.navbtn').forEach((b) => {
@@ -3169,14 +3183,20 @@ async function loadPresets() {
 
 async function boot() {
   wire();
-  await loadPrefs();
-  renderExamples();
-  loadPresets();
-  await loadStats();
-  await runScreen({ expression: 'Market Cap > 0' });
-  // The chat is the primary surface, so it boots with the app rather than on first click.
-  try { await initChat(); } catch { /* the empty state explains itself */ }
+  // The chat is the primary surface: start it first, so a failure in any later step cannot
+  // leave a new user staring at an empty screen.
+  try { await initChat(); } catch (e) { console.warn('chat failed to start', e); }
   try { initLibrary(); } catch { /* wired when the view opens */ }
+  // Every remaining step is independent; one failing must not stop the others.
+  for (const step of [
+    () => loadPrefs(),
+    () => renderExamples(),
+    () => loadPresets(),
+    () => loadStats(),
+    () => runScreen({ expression: 'Market Cap > 0' }),
+  ]) {
+    try { await step(); } catch (e) { console.warn('boot step failed', e); }
+  }
 }
 
 document.addEventListener('DOMContentLoaded', boot);
@@ -3185,3 +3205,253 @@ document.addEventListener('DOMContentLoaded', boot);
 // The global search box must work regardless of whether wire() has run.
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { try { initGlobalSearch(); } catch { /* ignore */ } });
 else { try { initGlobalSearch(); } catch { /* ignore */ } }
+
+// ===========================================================================
+// Chat threads: conversations persist on this device, not on a server.
+// Stored in localStorage under a single key, with the active thread id alongside.
+// ===========================================================================
+const THREADS_KEY = 'atlas.chat.threads.v1';
+const ACTIVE_KEY = 'atlas.chat.active.v1';
+
+function loadThreads() {
+  try { return JSON.parse(localStorage.getItem(THREADS_KEY) || '[]'); } catch { return []; }
+}
+function saveThreads(list) {
+  try { localStorage.setItem(THREADS_KEY, JSON.stringify(list.slice(0, 40))); } catch { /* quota */ }
+}
+function activeThreadId() {
+  try { return localStorage.getItem(ACTIVE_KEY); } catch { return null; }
+}
+function setActiveThread(id) {
+  try { localStorage.setItem(ACTIVE_KEY, id); } catch { /* quota */ }
+}
+
+function newThread() {
+  const t = { id: 't' + Date.now(), title: 'New conversation', at: Date.now(), turns: [] };
+  const list = loadThreads();
+  list.unshift(t);
+  saveThreads(list);
+  setActiveThread(t.id);
+  return t;
+}
+
+function currentThread() {
+  const list = loadThreads();
+  const id = activeThreadId();
+  return list.find((t) => t.id === id) ?? list[0] ?? null;
+}
+
+/** Persist one turn into the active thread, creating one if needed. */
+function persistTurn(turn) {
+  let list = loadThreads();
+  let id = activeThreadId();
+  // loadThreads() parses JSON, so the object it returns is a fresh copy: mutate the one in
+  // the list we are about to save, not a stale reference from before.
+  if (!id || !list.some((x) => x.id === id)) {
+    const created = newThread();
+    list = loadThreads();
+    id = created.id;
+  }
+  const t = list.find((x) => x.id === id);
+  if (!t) return;
+  t.turns.push(turn);
+  t.at = Date.now();
+  if (t.title === 'New conversation' && turn.role === 'user') {
+    t.title = turn.text.slice(0, 48) + (turn.text.length > 48 ? '…' : '');
+  }
+  saveThreads(list);
+  renderThreadList();
+}
+
+let _renderingThreads = false;
+function renderThreadList() {
+  const el = document.getElementById('chat-threads');
+  if (!el) return;
+  // Re-entrancy guard: opening a thread re-renders the list, and a handler firing during
+  // that render must not start another render.
+  if (_renderingThreads) return;
+  _renderingThreads = true;
+  try { renderThreadListInner(el); } finally { _renderingThreads = false; }
+}
+
+function renderThreadListInner(el) {
+  const list = loadThreads();
+  const active = activeThreadId();
+  el.innerHTML = list.length
+    ? list.map((t) => `<div class="threadrow${t.id === active ? ' active' : ''}" data-thread="${esc(t.id)}">
+        <button class="threadopen" data-open="${esc(t.id)}" title="${esc(t.title)}">${esc(t.title)}</button>
+        <button class="threaddel" data-del="${esc(t.id)}" aria-label="Delete conversation" title="Delete">×</button>
+      </div>`).join('')
+    : '<div class="hint" style="padding:6px 10px">No conversations yet</div>';
+  el.querySelectorAll('[data-open]').forEach((b) => {
+    b.onclick = () => openThread(b.dataset.open);
+  });
+  el.querySelectorAll('[data-del]').forEach((b) => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      const id = b.dataset.del;
+      saveThreads(loadThreads().filter((t) => t.id !== id));
+      if (activeThreadId() === id) setActiveThread(null);
+      openThread(loadThreads()[0]?.id ?? null);
+    };
+  });
+}
+
+function openThread(id) {
+  const log = document.getElementById('chat-log');
+  if (!log) return;
+  log.innerHTML = '';
+  if (!id) { setActiveThread(null); renderThreadList(); bootChatGreeting(); return; }
+  setActiveThread(id);
+  const t = loadThreads().find((x) => x.id === id);
+  if (t) for (const turn of t.turns) renderTurn(turn);
+  renderThreadList();
+}
+
+async function bootChatGreeting() {
+  try {
+    const g = await api('/api/chat/greeting');
+    renderTurn({ role: 'atlas', text: g.text, engine: g.engine, kind: 'ready', followUps: g.followUps, noPersist: true });
+  } catch { /* the empty state explains itself */ }
+}
+
+// ===========================================================================
+// A small Markdown renderer for answers. No library, no eval: it escapes first,
+// then applies a fixed set of inline and block rules.
+// ===========================================================================
+function renderMarkdown(text) {
+  const safe = String(text)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const lines = safe.split('\n');
+  let out = '';
+  let inList = false;
+  let inCode = false;
+  const closeList = () => { if (inList) { out += '</ul>'; inList = false; } };
+
+  for (const raw of lines) {
+    const line = raw;
+    if (/^```/.test(line)) { closeList(); inCode = !inCode; out += inCode ? '<pre class="mdcode">' : '</pre>'; continue; }
+    if (inCode) { out += line + '\n'; continue; }
+    if (/^\s*[-*]\s+/.test(line)) {
+      if (!inList) { out += '<ul>'; inList = true; }
+      out += '<li>' + inline(line.replace(/^\s*[-*]\s+/, '')) + '</li>';
+      continue;
+    }
+    closeList();
+    if (/^#{1,4}\s+/.test(line)) {
+      out += '<div class="mdh">' + inline(line.replace(/^#{1,4}\s+/, '')) + '</div>';
+      continue;
+    }
+    if (!line.trim()) { out += '<div class="mdgap"></div>'; continue; }
+    out += '<div>' + inline(line) + '</div>';
+  }
+  closeList();
+  if (inCode) out += '</pre>';
+
+  function inline(s) {
+    return s
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  }
+  return out;
+}
+
+// ===========================================================================
+// Drag and drop a document onto the Library, and read it.
+// A .txt, .md, .csv or .json file is read locally; nothing is uploaded.
+// ===========================================================================
+function initDropZone() {
+  const zone = document.getElementById('ingest-text');
+  const box = document.getElementById('ingest-drop');
+  if (!zone || !box || box.dataset.wired) return;
+  box.dataset.wired = '1';
+
+  const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+  ['dragenter', 'dragover'].forEach((ev) => box.addEventListener(ev, (e) => {
+    stop(e); box.classList.add('dragging');
+  }));
+  ['dragleave', 'drop'].forEach((ev) => box.addEventListener(ev, (e) => {
+    stop(e); box.classList.remove('dragging');
+  }));
+
+  box.addEventListener('drop', async (e) => {
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    const status = chatEl('ingest-status');
+    if (file.size > 400_000) {
+      if (status) status.textContent = `"${file.name}" is too large (limit 400,000 characters)`;
+      return;
+    }
+    if (!/\.(txt|md|markdown|csv|json)$/i.test(file.name)) {
+      if (status) status.textContent = 'Only .txt, .md, .csv and .json files can be read here';
+      return;
+    }
+    try {
+      const text = await file.text();
+      const ta = chatEl('ingest-text');
+      if (ta) ta.value = text;
+      const title = chatEl('ingest-title');
+      if (title && !title.value) title.value = file.name.replace(/\.[^.]+$/, '');
+      if (status) status.textContent = `Loaded "${file.name}" — press Read it`;
+    } catch (err) {
+      if (status) status.textContent = 'Could not read that file: ' + (err && err.message ? err.message : '');
+    }
+  });
+}
+
+// ===========================================================================
+// Voice input, using the browser's own speech recognition where it exists.
+// Nothing is sent anywhere: the recognition runs in the browser.
+// ===========================================================================
+let _voiceRec = null;
+let _voiceListening = false;
+
+function initVoice() {
+  const btn = document.getElementById('chat-mic');
+  if (!btn) return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    btn.disabled = true;
+    btn.title = 'This browser does not offer speech recognition';
+    btn.setAttribute('aria-label', 'Voice input unavailable in this browser');
+  }
+}
+
+function toggleVoice() {
+  const btn = document.getElementById('chat-mic');
+  if (!btn || btn.disabled) return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return;
+  let rec = _voiceRec;
+  let listening = _voiceListening;
+  {
+    if (listening) { try { rec.stop(); } catch { /* already stopped */ } return; }
+    try {
+      rec = new SR();
+      _voiceRec = rec;
+      rec.lang = document.documentElement.lang || 'en-IN';
+      rec.interimResults = true;
+      rec.continuous = false;
+      const input = chatEl('chat-input');
+      const eng = chatEl('chat-engine');
+      rec.onstart = () => { _voiceListening = true; btn.classList.add('listening'); if (eng) eng.textContent = 'Listening…'; };
+      rec.onresult = (ev) => {
+        let text = '';
+        for (let i = 0; i < ev.results.length; i++) text += ev.results[i][0].transcript;
+        if (input) { input.value = text; input.style.height = 'auto'; }
+      };
+      rec.onerror = (ev) => {
+        if (eng) eng.textContent = ev.error === 'not-allowed' ? 'Microphone permission was declined' : 'Voice error: ' + ev.error;
+      };
+      rec.onend = () => {
+        _voiceListening = false; btn.classList.remove('listening');
+        if (eng) eng.textContent = 'Ready';
+      };
+      rec.start();
+    } catch (e) {
+      if (chatEl('chat-engine')) chatEl('chat-engine').textContent = 'Voice could not start';
+    }
+  }
+}

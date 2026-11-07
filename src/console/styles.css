@@ -576,3 +576,70 @@ body.wall .broadcast-bar, body.wall .section-h .spacer, body.wall .section-h .bt
   .nav { padding: 6px 8px; }
   .nav .navbtn { padding: 6px 10px; font-size: 12px; }
 }
+
+/* ---- Conversations ------------------------------------------------------- */
+.chatview { display: none; }
+.chatview.active { display: flex; gap: 0; height: calc(100vh - 96px); }
+.threads {
+  width: 218px; flex: 0 0 218px; border-right: 1px solid var(--line);
+  padding: 12px 10px; overflow-y: auto; background: var(--surface-1);
+}
+.threadlist { display: flex; flex-direction: column; gap: 2px; }
+.threadrow { display: flex; align-items: center; gap: 2px; border-radius: var(--radius-sm); }
+.threadrow:hover { background: var(--surface-2); }
+.threadrow.active { background: var(--brand-soft); }
+.threadopen {
+  flex: 1; min-width: 0; text-align: left; background: none; border: 0; cursor: pointer;
+  padding: 7px 9px; font: inherit; font-size: 12.5px; color: var(--ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: var(--radius-sm);
+}
+.threadrow.active .threadopen { color: var(--brand); font-weight: 600; }
+.threaddel {
+  background: none; border: 0; cursor: pointer; color: var(--ink-3); font-size: 15px;
+  padding: 4px 8px; line-height: 1; border-radius: var(--radius-sm); opacity: 0;
+}
+.threadrow:hover .threaddel { opacity: 1; }
+.threaddel:hover { color: var(--negative); }
+
+/* ---- Markdown in bubbles ------------------------------------------------- */
+.bubble ul { margin: 6px 0; padding-left: 18px; }
+.bubble li { margin-bottom: 3px; }
+.bubble .mdh { font-weight: 700; margin: 8px 0 3px; font-size: 13.5px; }
+.bubble .mdgap { height: 6px; }
+.bubble code {
+  font-family: var(--mono); font-size: 11.5px; background: var(--surface-2);
+  padding: 1px 4px; border-radius: 4px; border: 1px solid var(--line);
+}
+.bubble .mdcode {
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 9px 11px; font-family: var(--mono); font-size: 11.5px; overflow-x: auto;
+  margin: 7px 0; white-space: pre;
+}
+.bubble a { color: var(--brand); text-decoration: underline; text-underline-offset: 2px; }
+.msg.user .bubble code, .msg.user .bubble a { background: rgba(255,255,255,.16); color: #fff; border-color: transparent; }
+
+/* On a phone the conversation list becomes a drawer above the chat. */
+@media (max-width: 900px) {
+  .chatview.active { flex-direction: column; height: calc(100vh - 150px); }
+  .threads {
+    width: 100%; flex: 0 0 auto; max-height: 128px; border-right: 0;
+    border-bottom: 1px solid var(--line); padding: 8px 10px;
+  }
+  .threadlist { flex-direction: row; overflow-x: auto; gap: 6px; }
+  .threadrow { flex: 0 0 auto; max-width: 180px; border: 1px solid var(--line); }
+  .threaddel { opacity: 1; }
+}
+
+/* Inside the chat view the log takes the remaining width; the old centred
+   max-width would squeeze the conversation list to nothing. */
+.chatview.active .chatwrap { flex: 1; min-width: 0; max-width: none; margin: 0; height: auto; }
+
+/* ---- Drop zone and voice ------------------------------------------------- */
+.dropzone {
+  border: 1.5px dashed var(--line-strong); border-radius: var(--radius-md);
+  padding: 10px; margin-top: 8px; transition: border-color 140ms, background 140ms;
+}
+.dropzone.dragging { border-color: var(--brand); background: var(--brand-soft); }
+.dropzone .hint { display: block; margin-bottom: 8px; font-size: 11.5px; }
+#chat-mic.listening { color: var(--negative); animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }

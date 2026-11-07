@@ -70,9 +70,13 @@ ok('an empty document is handled', B.ingestDocument('').rules.length===0);
   const br=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/local/bin/chromium',args:['--no-sandbox']});
 
   for (const [label,w,h] of [['phone',412,880],['desktop',1400,900]]) {
-    const pg=await br.newPage({viewport:{width:w,height:h}});
+    const ctx=await br.newContext({viewport:{width:w,height:h}});
+    const pg=await ctx.newPage();
     const errs=[]; pg.on('pageerror',e=>errs.push(String(e).slice(0,80)));
-    await pg.goto(base,{waitUntil:'networkidle'}); await pg.waitForTimeout(2000);
+    await pg.goto(base,{waitUntil:'networkidle'});
+    // A fresh context starts with no stored conversation, which is the first-run case.
+    await pg.evaluate(()=>{ try { localStorage.clear(); } catch { /* ignore */ } });
+    await pg.reload({waitUntil:'networkidle'}); await pg.waitForTimeout(2000);
     ok(`${label}: chat opens by default`, await pg.locator('#view-chat').isVisible());
     ok(`${label}: the greeting renders`, (await pg.locator('#chat-log .msg').count())>=1);
     ok(`${label}: the composer is usable`, await pg.locator('#chat-input').isVisible());
@@ -83,7 +87,7 @@ ok('an empty document is handled', B.ingestDocument('').rules.length===0);
     await pg.waitForTimeout(1500);
     ok(`${label}: an answer arrives`, (await pg.locator('#chat-log .msg').count())>=3);
     ok(`${label}: no page errors`, errs.length===0, errs[0]||'');
-    await pg.close();
+    await ctx.close();
   }
 
   const pg=await br.newPage({viewport:{width:412,height:880}});
@@ -95,6 +99,28 @@ ok('an empty document is handled', B.ingestDocument('').rules.length===0);
   ok('a pasted rule produces a screen', (await pg.locator('#ingest-status').innerText()).includes('rule'));
   ok('the rules are rendered', (await pg.locator('#ingest-result .scorecard').count())>=3);
   await pg.close();
+
+  console.log('\n=== CONVERSATIONS PERSIST ===');
+  const pg2=await br.newPage({viewport:{width:1400,height:900}});
+  await pg2.goto(base,{waitUntil:'networkidle'}); await pg2.waitForTimeout(1800);
+  await pg2.fill('#chat-input','what is a P/E ratio?'); await pg2.click('#chat-send'); await pg2.waitForTimeout(1400);
+  const saved=JSON.parse(await pg2.evaluate(()=>localStorage.getItem('atlas.chat.threads.v1'))||'[]');
+  ok('a conversation is stored on the device', saved.length>=1, String(saved.length));
+  ok('both turns are kept', (saved[0]?.turns?.length ?? 0)>=2, String(saved[0]?.turns?.length));
+  ok('the thread is titled from the question', /P\/E/.test(saved[0]?.title ?? ''), saved[0]?.title?.slice(0,30));
+  await pg2.reload({waitUntil:'networkidle'}); await pg2.waitForTimeout(2200);
+  ok('the conversation list survives a reload', (await pg2.locator('.threadrow').count())>=1);
+  ok('the conversation is restored', (await pg2.locator('#chat-log .msg').count())>=2);
+  ok('the greeting is not stored as a turn', !(saved[0]?.turns ?? []).some(t=>/Atlas is ready/.test(t.text||'')));
+
+  console.log('\n=== MARKDOWN AND EXTRAS ===');
+  ok('answers are rendered as markdown', await pg2.evaluate(()=>{
+    const b=document.querySelector('#chat-log .msg.atlas .bubble');
+    return !!b && /<(div|ul|code|strong)/.test(b.innerHTML); }));
+  ok('a drop zone exists in the library', await pg2.evaluate(()=>!!document.getElementById('ingest-drop')));
+  ok('a voice control exists', await pg2.evaluate(()=>!!document.getElementById('chat-mic')));
+  ok('a new-conversation control exists', await pg2.evaluate(()=>!!document.getElementById('chat-new')));
+  await pg2.close();
 
   await br.close(); await atlas.close(); fs.rmSync(home,{recursive:true,force:true});
   console.log(fails===0?'\nCHAT UI PASSED':`\n${fails} FAILED`);

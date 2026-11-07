@@ -77,6 +77,10 @@
 <main class="content">
   <!-- Screener -->
   <section id="view-chat" class="view active chatview">
+    <aside class="threads" aria-label="Conversations">
+      <button class="btn sm" id="chat-new" style="width:100%;margin-bottom:8px">+ New conversation</button>
+      <div id="chat-threads" class="threadlist"></div>
+    </aside>
     <div class="chatwrap">
       <div class="chatlog" id="chat-log" aria-live="polite"></div>
       <div class="chatcompose">
@@ -89,6 +93,7 @@
         </div>
         <div class="chatrow">
           <textarea id="chat-input" class="chatinput" rows="1" placeholder="Ask about a company, the market, or any term…" aria-label="Your question"></textarea>
+          <button class="btn ghost" id="chat-mic" aria-label="Voice input" title="Speak your question">🎤</button>
           <button class="btn primary" id="chat-send" aria-label="Send">Send</button>
         </div>
         <div class="hint chatsmall">Everything runs on this device. Atlas will not invent a number it cannot trace.</div>
@@ -102,8 +107,9 @@
       <div class="scorecard" style="grid-column: span 2">
         <div class="t">DOCUMENT</div>
         <input id="ingest-title" class="input sm" placeholder="Title, e.g. Quality Rule" aria-label="Document title" />
+        <div id="ingest-drop" class="dropzone"><span class="hint">Drag a .txt, .md, .csv or .json file here, or paste below</span>
         <textarea id="ingest-text" class="input" rows="10" style="margin-top:8px;width:100%;font-family:var(--mono);font-size:12px"
-          placeholder="Paste the text here.&#10;&#10;Example:&#10;Buy when the P/E is below 20 and the debt to equity is less than 1.&#10;Exit when the operating margin falls below 10 percent."></textarea>
+          placeholder="Paste the text here.&#10;&#10;Example:&#10;Buy when the P/E is below 20 and the debt to equity is less than 1.&#10;Exit when the operating margin falls below 10 percent."></textarea></div>
         <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
           <button class="btn primary" id="ingest-run">Read it</button>
           <span class="hint" id="ingest-status">Nothing pasted yet</span>
