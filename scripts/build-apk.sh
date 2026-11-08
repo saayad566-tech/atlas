@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+# The JVM defaults to a heap this device cannot reserve. Cap it so the build does not die
+# with "Could not reserve enough space for object heap" on a 2 GB machine.
+# Append rather than default: the environment may already set other JVM flags, and a plain
+# default would silently keep them while never adding the heap cap.
+case "${JAVA_TOOL_OPTIONS:-}" in
+  *-Xmx*) : ;;                                   # a heap is already specified
+  *) export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Xmx768m" ;;
+esac
 # Build a signed release APK from the PWA without Gradle.
 # Everything is reproducible: the keystore is generated from documented values if it is
 # missing, so no binary secret has to survive between machines.

@@ -70,6 +70,8 @@ import { coffeeScorecard, SCORECARD_LINES, verdictFor } from '../core/coffee';
 import { fetchNseBoard, fetchNseStatus, storeBoard, storedBoard } from '../core/nse';
 import { chatReply, chatGreeting } from '../core/chat';
 import { ingestDocument } from '../core/bookingest';
+import { carryFor, allPolicyRates } from '../core/carry';
+import { createBackup, writeBackup, readBackup, restoreBackup, describeBackup } from '../core/backup';
 import { gutTest, positionSize, CHECKLIST } from '../core/gut';
 import { downloadModel, progressOf, directUrl } from '../core/modeldownload';
 import { seedFromBundle } from '../core/directory';
@@ -153,7 +155,8 @@ const MIME: Record<string, string> = {
 
 export function createServer(initialDb: Db, consoleDir: string, dataDir?: string): http.Server {
   // One database file per market: switching cannot leak rows between countries.
-  const markets = new MarketManager(dataDir ?? path.join(process.cwd(), 'data'), 'IN');
+  const baseDir = dataDir ?? path.join(process.cwd(), 'data');
+  const markets = new MarketManager(baseDir, 'IN');
   let db: Db = initialDb;
   let store = new Store(db.db);
   let flow = new Workflow(db.db);
@@ -166,8 +169,8 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
   });
   const tenants = new Tenants(initialDb.db);
   const llm = new LocalLlm();
-  const aiStore = new AiStore(dataDir ?? path.join(process.cwd(), 'data'));
-  const models = new ModelStore(dataDir ?? path.join(process.cwd(), 'data'));
+  const aiStore = new AiStore(baseDir);
+  const models = new ModelStore(baseDir);
   // Auto-update: refresh the stalest live companies on a timer.
   const scheduler = new RefreshScheduler({
     refresh: async (symbol: string): Promise<boolean> => {
@@ -1554,6 +1557,72 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       // ---- back data: browse any stored date range ----
       // ---- newsroom: per-country market news, cached for offline reading ----
       // ---- trading sessions ----
+      // ---- forex carry from bundled policy rates ----
+      if (p === '/api/carry/rates') {
+        return json(res, 200, { rates: allPolicyRates(), note: 'Bundled reference rates; each names the central bank that sets it.' });
+      }
+      if (p.startsWith('/api/carry/')) {
+        const parts = p.replace('/api/carry/', '').split('/');
+        const base = (parts[0] ?? '').toUpperCase();
+        const quote = (parts[1] ?? '').toUpperCase();
+        if (!base || !quote) return json(res, 400, { error: 'Give a base and a quote currency' });
+        let spot: number | null = null;
+        try {
+          const row = db.db.prepare('SELECT close FROM price_history ORDER BY date DESC LIMIT 1').get() as { close: number } | undefined;
+          if (row && Number.isFinite(row.close)) spot = row.close;
+        } catch { /* no price history */ }
+        return json(res, 200, carryFor(base, quote, spot));
+      }
+
+      // ---- backup and restore: redundancy without a server ----
+      if (p === '/api/backup' && req.method === 'POST') {
+        const b = (await readBody(req)) as { settings?: Record<string, unknown> };
+        const version = '3.9.0';
+        const backup = createBackup(baseDir, b.settings ?? {}, version);
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const file = `${baseDir}/atlas-backup-${stamp}.atlas.gz`;
+        const written = writeBackup(file, backup);
+        return json(res, 200, { ...written, summary: describeBackup(backup), manifest: backup.manifest });
+      }
+      if (p === '/api/backup/inspect' && req.method === 'POST') {
+        const b = (await readBody(req)) as { path?: string };
+        if (!b.path) return json(res, 400, { error: 'Give the path of a backup file' });
+        const backup = readBackup(b.path);
+        if (!backup) return json(res, 400, { error: 'That file is not an Atlas backup' });
+        return json(res, 200, { summary: describeBackup(backup), manifest: backup.manifest });
+      }
+      if (p === '/api/backup/restore' && req.method === 'POST') {
+        const b = (await readBody(req)) as { path?: string };
+        if (!b.path) return json(res, 400, { error: 'Give the path of a backup file' });
+        const backup = readBackup(b.path);
+        if (!backup) return json(res, 400, { error: 'That file is not an Atlas backup' });
+        const r = restoreBackup(backup, baseDir);
+        return json(res, 200, { ...r, note: 'Restart Atlas so the restored databases are opened.' });
+      }
+
+      // ---- settings and resource status ----
+      if (p === '/api/settings/status') {
+        let companies = 0, markets = 0;
+        try { companies = (db.db.prepare('SELECT COUNT(*) AS n FROM companies').get() as { n: number }).n; } catch { companies = 0; }
+        // Each market is a separate database, so there is no market column to count.
+        // Report how many market databases actually hold rows.
+        try {
+          const dir = `${baseDir}/markets`;
+          const { existsSync, readdirSync, statSync } = require('node:fs') as typeof import('node:fs');
+          if (existsSync(dir)) {
+            markets = readdirSync(dir).filter((f: string) => f.endsWith('.db') && statSync(`${dir}/${f}`).size > 0).length;
+          }
+        } catch { markets = 0; }
+        const mem = process.memoryUsage();
+        return json(res, 200, {
+          version: '3.9.0',
+          companies, markets,
+          model: llm.activeModelId(),
+          memory: { rssMb: Math.round(mem.rss / 1_048_576), heapMb: Math.round(mem.heapUsed / 1_048_576) },
+          node: process.version,
+          uptimeSec: Math.round(process.uptime()),
+        });
+      }
       // ---- chat: the primary surface ----
       if (p === '/api/chat/greeting') {
         let n = 0;

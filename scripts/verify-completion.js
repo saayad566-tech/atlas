@@ -1,0 +1,90 @@
+// The work that closed the remaining scope: carry, backup/restore, settings, export, motion.
+const fs=require('fs'),os=require('os'),path=require('path');
+const { chromium }=require('playwright-core');
+const { createAtlas }=require('../dist/gateway');
+const C=require('../dist/finance/core/carry');
+const B=require('../dist/finance/core/backup');
+let fails=0; const ok=(n,c,d)=>{ if(!c) fails++; console.log(`  ${c?'PASS':'FAIL'}  ${n}${d?'  — '+d:''}`); };
+
+console.log('=== FOREX CARRY ===');
+const usdjpy=C.carryFor('USD','JPY',150);
+ok('the differential is base minus quote', usdjpy.differentialPct===4, String(usdjpy.differentialPct));
+ok('a positive differential means long the base', usdjpy.direction==='long-base');
+ok('the carry is annualised on a standard lot', usdjpy.annualCarryPerLot>0, String(usdjpy.annualCarryPerLot));
+ok('every rate names its central bank', !!usdjpy.baseRate?.centralBank && !!usdjpy.quoteRate?.centralBank);
+ok('every rate carries a date', usdjpy.asOf==='2026-01-01', usdjpy.asOf);
+const inverse=C.carryFor('JPY','USD',150);
+ok('the reverse pair flips the direction', inverse.differentialPct===-4 && inverse.direction==='long-quote');
+ok('a missing currency says so rather than guessing', /No policy rate/.test(C.carryFor('USD','XYZ',1).note));
+ok('twelve rates are bundled', C.allPolicyRates().length===12);
+ok('rates are sorted highest first', C.allPolicyRates()[0].rate >= C.allPolicyRates().at(-1).rate);
+
+console.log('\n=== BACKUP AND RESTORE ===');
+const src=fs.mkdtempSync(path.join(os.tmpdir(),'bk-'));
+fs.mkdirSync(path.join(src,'markets'),{recursive:true});
+fs.writeFileSync(path.join(src,'markets','IN-STOCK.db'), Buffer.from('a'.repeat(4000)));
+fs.writeFileSync(path.join(src,'markets','US-ETF.db'), Buffer.from('b'.repeat(2000)));
+fs.writeFileSync(path.join(src,'markets','zero.db'), Buffer.alloc(0));
+const bk=B.createBackup(src,{theme:'dark'},'3.9.0');
+ok('both databases are packed', Object.keys(bk.data).length===2, String(Object.keys(bk.data).length));
+ok('an empty database is skipped', !bk.data['zero.db']);
+ok('the manifest records sizes', bk.manifest.databases.every(d=>d.bytes>0));
+const out=path.join(src,'b.atlas.gz');
+const w=B.writeBackup(out,bk);
+ok('the file is written and compressed', w.bytes>0 && w.bytes < 4000+2000, w.bytes+' bytes');
+const back=B.readBackup(out);
+ok('it reads back', !!back && Object.keys(back.data).length===2);
+ok('a non-backup file is refused', B.readBackup(path.join(src,'nope.txt'))===null);
+const dst=fs.mkdtempSync(path.join(os.tmpdir(),'dst-'));
+const r=B.restoreBackup(back,dst);
+ok('both databases restore', r.restored.length===2, r.restored.join(','));
+ok('the restored bytes match', fs.statSync(path.join(dst,'markets','IN-STOCK.db')).size===4000);
+const evil={...back,data:{'../escape.db':back.data['IN-STOCK.db'],'ok.db':back.data['US-ETF.db']}};
+const r2=B.restoreBackup(evil,dst);
+ok('a path in the archive is refused', r2.skipped.includes('../escape.db'));
+ok('a safe name in the same archive still restores', r2.restored.includes('ok.db'));
+ok('the summary is human readable', /database/.test(B.describeBackup(back)));
+
+(async()=>{
+  console.log('\n=== ENDPOINTS AND INTERFACE ===');
+  const home=fs.mkdtempSync(path.join(os.tmpdir(),'e-'));
+  const atlas=createAtlas({dataDir:home,consoleDir:path.join(process.cwd(),'dist','console')});
+  await new Promise(r=>atlas.server.listen(0,r));
+  const base=`http://127.0.0.1:${atlas.server.address().port}`;
+  const post=(p,b)=>fetch(base+'/api/fin'+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b??{})});
+  await post('/api/setup/complete',{code:'IN'}); await post('/api/seed',{companies:6});
+
+  const rates=await (await fetch(base+'/api/fin/api/carry/rates')).json();
+  ok('the rates endpoint lists them', rates.rates.length===12);
+  const carry=await (await fetch(base+'/api/fin/api/carry/INR/USD')).json();
+  ok('a carry request answers', typeof carry.differentialPct==='number', carry.differentialPct+'pp');
+  const status=await (await fetch(base+'/api/fin/api/settings/status')).json();
+  ok('status reports a version', !!status.version, status.version);
+  ok('status reports memory', status.memory.rssMb>0, status.memory.rssMb+' MB');
+  ok('status reports how many markets hold data', status.markets>=1, String(status.markets));
+  const bkp=await (await post('/api/backup',{settings:{theme:'dark'}})).json();
+  ok('a backup is created through the API', bkp.bytes>0, bkp.bytes+' bytes');
+  ok('the backup reports what it holds', /database/.test(bkp.summary), bkp.summary);
+
+  const br=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/local/bin/chromium',args:['--no-sandbox']});
+  const ctx=await br.newContext({viewport:{width:1400,height:900}});
+  const pg=await ctx.newPage();
+  const errs=[]; pg.on('pageerror',e=>errs.push(String(e).slice(0,90)));
+  await pg.goto(base,{waitUntil:'networkidle'}); await pg.waitForTimeout(1800);
+  await pg.evaluate(()=>document.querySelector('[data-view="settings"]').click());
+  await pg.waitForTimeout(1400);
+  ok('the settings view opens', await pg.locator('#view-settings').isVisible());
+  ok('four status cards render', (await pg.locator('#settings-status .scorecard').count())===4);
+  ok('the reference rates render', (await pg.locator('#carry-rates .scorecard').count())===12);
+  await pg.fill('#carry-base','USD'); await pg.fill('#carry-quote','JPY');
+  await pg.click('#carry-run'); await pg.waitForTimeout(900);
+  ok('carry calculates in the interface', /pp/.test(await pg.locator('#carry-result').innerText()));
+  await pg.click('#backup-create'); await pg.waitForTimeout(1400);
+  ok('a backup runs from the interface', /Backup written/.test(await pg.locator('#backup-status').innerText()));
+  ok('export controls exist', await pg.locator('#export-threads-json').isVisible() && await pg.locator('#export-threads-md').isVisible());
+  ok('no page errors', errs.length===0, errs[0]||'');
+  await ctx.close(); await br.close(); await atlas.close(); fs.rmSync(home,{recursive:true,force:true});
+
+  console.log(fails===0?'\nCOMPLETION PASSED':`\n${fails} FAILED`);
+  process.exit(fails===0?0:1);
+})();

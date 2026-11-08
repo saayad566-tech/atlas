@@ -1,6 +1,6 @@
 # Atlas — Full Product Requirements and Delivery Report
 
-**Version 3.6.0** · 7 November 2026 · Status: as-built
+**Version 3.9.0** · 9 November 2026 · Status: as-built
 **This document supersedes `docs/PRD.md`.** It covers what Atlas is, what works, what does
 not, and the status of every instruction given during the build.
 
@@ -330,16 +330,16 @@ P/E was never known.
 | # | Limitation | Impact | What would close it |
 |---|---|---|---|
 | 1 | Per-symbol live quotes rate-limited from shared IPs | Yahoo returns 429. NSE board works; per-stock quotes need deeper session priming or a licensed feed | a licensed per-symbol feed |
-| 2 | Forex carry unimplemented | no policy-rate source on the allowlist | add a rates source |
+| 2 | ~~Forex carry unimplemented~~ | **Closed in 3.9.0** — a bundled table of 12 policy rates, each naming its central bank and the date it took effect, with the differential and annual carry on a standard lot. The date is shown so the figure is never mistaken for live | — |
 | 3 | ETF holdings absent | no free constituent feed | parse issuer pages, or ship a bundle |
 | 4 | History depth 4–5 years | Yahoo's limit, not a code limit | a deeper historical source |
 | 5 | Intent recognition not 100% | `ask.ts` covers 7 intents by rule; anything outside falls back deterministically | measure misroutes before claiming accuracy |
-| 6 | Cloud sync is an interface, not a service | the engine is ready; no server exists | an endpoint |
+| 6 | ~~Cloud sync is an interface, not a service~~ | **Closed differently in 3.9.0** — redundancy without a server: the whole local state exports to one compressed file the user owns and restores from it, with path-traversal refused. A hosted sync endpoint would still need a server | — |
 | 7 | 67 advisor methods, not 10,000 | padding further would mean inventing people | genuine research |
 | 8 | Direct newspaper scraping blocked | all 12 national feeds refuse; news comes via Google News RSS | direct feeds when reachable |
 | 9 | **Flutter app not delivered** | attempted twice; source lost to a sandbox recycle, APK blocked by an allowlist rule | rebuild in a durable environment |
 | 10 | iOS build | requires macOS toolchain | a macOS runner |
-| 11 | Animation pass incomplete | motion tokens exist; the animated polish asked for is not finished | a dedicated UI pass |
+| 11 | ~~Animation pass incomplete~~ | **Closed in 3.9.0** — a consistent motion set (view fade, card lift, button press, message entry) under `prefers-reduced-motion`, plus a visible focus ring | — |
 
 ---
 

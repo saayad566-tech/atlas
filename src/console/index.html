@@ -60,6 +60,7 @@
     <button class="navbtn" data-view="compare">Compare</button>
     <button class="navbtn" data-view="store">AI Store</button>
     <button class="navbtn" data-view="library">Library</button>
+    <button class="navbtn" data-view="settings">Settings</button>
     <button class="navbtn" data-view="import">Import</button>
   </nav>
 
@@ -103,6 +104,55 @@
         <div class="hint chatsmall">Everything runs on this device. Atlas will not invent a number it cannot trace.</div>
       </div>
     </div>
+  </section>
+
+  <section id="view-settings" class="view">
+    <div class="section-h">This device <span class="hint">what Atlas is running and what it holds</span></div>
+    <div class="cards" id="settings-status"></div>
+
+    <div class="section-h">Export <span class="hint">your conversations, as a file you own</span></div>
+    <div class="cards">
+      <div class="scorecard" style="grid-column: span 2">
+        <div class="t">CONVERSATIONS</div>
+        <div class="d hint">Downloads every stored conversation as JSON. Nothing is uploaded.</div>
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn sm" id="export-threads-json">Export as JSON</button>
+          <button class="btn sm" id="export-threads-md">Export as Markdown</button>
+          <button class="btn sm ghost" id="clear-threads">Delete all conversations</button>
+        </div>
+        <div class="hint" id="export-status" style="margin-top:6px"></div>
+      </div>
+    </div>
+
+    <div class="section-h">Backup and restore <span class="hint">redundancy without a server — the file is yours</span></div>
+    <div class="cards">
+      <div class="scorecard" style="grid-column: span 2">
+        <div class="t">LOCAL DATA</div>
+        <div class="d hint">Writes every market database and your settings into one compressed file on this device.</div>
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn sm primary" id="backup-create">Create a backup</button>
+          <button class="btn sm" id="backup-inspect-open">Inspect a file</button>
+        </div>
+        <div class="hint" id="backup-status" style="margin-top:6px"></div>
+        <div id="backup-result" style="margin-top:8px"></div>
+      </div>
+    </div>
+
+    <div class="section-h">Forex carry <span class="hint">the interest differential between two currencies</span></div>
+    <div class="cards">
+      <div class="scorecard" style="grid-column: span 2">
+        <div class="t">PAIR</div>
+        <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+          <input id="carry-base" class="input sm" placeholder="USD" maxlength="3" aria-label="Base currency" />
+          <input id="carry-quote" class="input sm" placeholder="JPY" maxlength="3" aria-label="Quote currency" />
+          <button class="btn sm" id="carry-run">Calculate</button>
+        </div>
+        <div id="carry-result" style="margin-top:8px"></div>
+      </div>
+    </div>
+
+    <div class="section-h">Reference rates <span class="hint">bundled, dated, and named by the bank that sets them</span></div>
+    <div class="cards" id="carry-rates"></div>
   </section>
 
   <section id="view-library" class="view">

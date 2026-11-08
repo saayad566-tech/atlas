@@ -1,6 +1,6 @@
 {
   "name": "atlas",
-  "version": "3.8.1",
+  "version": "3.9.0",
   "private": true,
   "type": "commonjs",
   "description": "Local-first multi-asset investment analysis: stocks, ETFs, forex and crypto across nine markets, offline by default.",
@@ -95,7 +95,8 @@
     "get-model": "bash scripts/get-model.sh",
     "verify:coffee": "node scripts/verify-coffee-gut.js",
     "verify:nse": "node scripts/verify-nse.js",
-    "verify:chat-ui": "node scripts/verify-chat-ui.js"
+    "verify:chat-ui": "node scripts/verify-chat-ui.js",
+    "verify:completion": "node scripts/verify-completion.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.5.0"

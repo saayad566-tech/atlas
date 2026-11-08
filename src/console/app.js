@@ -326,6 +326,114 @@ function renderIngest(r) {
   }
 }
 
+
+// ---- Settings: status, export, backup, carry -------------------------------
+async function loadSettings() {
+  const el = $('#settings-status');
+  if (!el) return;
+  try {
+    const r = await api('/api/settings/status');
+    const mem = r.memory || {};
+    el.innerHTML =
+      `<div class="scorecard"><div class="t">VERSION</div><div class="d big">${esc(r.version)}</div>
+        <div class="d hint">Node ${esc(r.node)}</div></div>`
+      + `<div class="scorecard"><div class="t">COMPANIES</div><div class="d big">${nf.format(r.companies)}</div>
+        <div class="d hint">across ${r.markets} market${r.markets === 1 ? '' : 's'}</div></div>`
+      + `<div class="scorecard"><div class="t">LOCAL MODEL</div>
+        <div class="d big" style="font-size:16px">${r.model ? esc(String(r.model).slice(0, 18)) : 'none'}</div>
+        <div class="d hint">${r.model ? 'loaded and answering' : 'answers come from stored data'}</div></div>`
+      + `<div class="scorecard"><div class="t">MEMORY</div><div class="d big">${mem.rssMb ?? '—'} MB</div>
+        <div class="d hint">heap ${mem.heapMb ?? '—'} MB · up ${Math.round((r.uptimeSec || 0) / 60)} min</div></div>`;
+  } catch { el.innerHTML = '<div class="scorecard"><div class="t">STATUS</div><div class="d hint">Could not read status</div></div>'; }
+}
+
+async function loadCarryRates() {
+  const el = $('#carry-rates');
+  if (!el) return;
+  try {
+    const r = await api('/api/carry/rates');
+    el.innerHTML = r.rates.map((x) => `<div class="scorecard"><div class="t">${esc(x.currency)}</div>
+      <div class="d big">${x.rate.toFixed(2)}%</div>
+      <div class="d hint">${esc(x.centralBank)}</div></div>`).join('');
+  } catch { el.innerHTML = ''; }
+}
+
+async function runCarry() {
+  const base = ($('#carry-base')?.value || '').trim().toUpperCase();
+  const quote = ($('#carry-quote')?.value || '').trim().toUpperCase();
+  const out = $('#carry-result');
+  if (!out) return;
+  if (!base || !quote) { out.innerHTML = '<div class="hint">Give two currency codes, e.g. USD and JPY</div>'; return; }
+  try {
+    const r = await api(`/api/carry/${encodeURIComponent(base)}/${encodeURIComponent(quote)}`);
+    out.innerHTML = `<div class="d big">${r.differentialPct > 0 ? '+' : ''}${r.differentialPct.toFixed(2)} pp</div>
+      <div class="d hint">${esc(r.note)}</div>
+      <div class="d hint" style="margin-top:4px">Rates as of ${esc(r.asOf || '—')} · ${esc(r.baseRate?.centralBank || '')} vs ${esc(r.quoteRate?.centralBank || '')}</div>`;
+  } catch (e) { out.innerHTML = '<div class="hint">Could not calculate carry</div>'; }
+}
+
+function downloadText(name, text, type) {
+  const blob = new Blob([text], { type: type || 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function exportThreads(format) {
+  const list = loadThreads();
+  const status = $('#export-status');
+  if (!list.length) { if (status) status.textContent = 'No conversations to export'; return; }
+  const stamp = new Date().toISOString().slice(0, 10);
+  if (format === 'json') {
+    downloadText(`atlas-conversations-${stamp}.json`, JSON.stringify(list, null, 2), 'application/json');
+  } else {
+    const md = list.map((t) => {
+      const when = new Date(t.at || Date.now()).toLocaleString();
+      const body = t.turns.map((x) => `**${x.role === 'user' ? 'You' : 'Atlas'}**\n\n${x.text}`).join('\n\n---\n\n');
+      return `# ${t.title}\n\n_${when}_\n\n${body}`;
+    }).join('\n\n\n');
+    downloadText(`atlas-conversations-${stamp}.md`, md, 'text/markdown');
+  }
+  if (status) status.textContent = `Exported ${list.length} conversation${list.length === 1 ? '' : 's'}`;
+}
+
+async function createBackup() {
+  const status = $('#backup-status');
+  if (status) status.textContent = 'Packing…';
+  try {
+    const r = await api('/api/backup', { method: 'POST', body: JSON.stringify({ settings: { theme: document.documentElement.dataset.theme || 'auto' } }) });
+    if (status) status.textContent = `Backup written: ${r.summary}`;
+    const out = $('#backup-result');
+    if (out) out.innerHTML = `<div class="d mono" style="font-size:11px;word-break:break-all">${esc(r.path)}</div>
+      <div class="hint" style="margin-top:4px">${nf.format(r.bytes)} bytes. Copy this file somewhere you control — it is not encrypted.</div>`;
+  } catch (e) { if (status) status.textContent = 'Backup failed: ' + (e && e.message ? e.message : 'unknown'); }
+}
+
+async function inspectBackup() {
+  const path = prompt('Path of the backup file to inspect or restore:');
+  if (!path) return;
+  const status = $('#backup-status');
+  if (status) status.textContent = 'Reading…';
+  try {
+    const r = await api('/api/backup/inspect', { method: 'POST', body: JSON.stringify({ path }) });
+    if (status) status.textContent = r.summary;
+    const out = $('#backup-result');
+    if (out) out.innerHTML = `<div class="d hint">${r.manifest.databases.map((d) => esc(d.name)).join(', ')}</div>
+      <button class="btn sm" id="backup-restore" style="margin-top:6px">Restore this backup</button>`;
+    const btn = $('#backup-restore');
+    if (btn) btn.onclick = async () => {
+      btn.disabled = true;
+      try {
+        const res = await api('/api/backup/restore', { method: 'POST', body: JSON.stringify({ path }) });
+        if (status) status.textContent = `Restored ${res.restored.length} database(s). ${res.note}`;
+      } catch (e) { if (status) status.textContent = 'Restore failed'; }
+      btn.disabled = false;
+    };
+  } catch (e) { if (status) status.textContent = 'That file is not an Atlas backup'; }
+}
+
 async function loadSession() {
   const el = $('#session-badge');
   if (!el) return;
@@ -868,7 +976,7 @@ const VIEWS = {
   chat: 'view-chat', library: 'view-library',
   screener: 'view-screener', company: 'view-company', watchlist: 'view-watchlist',
   rank: 'view-rank', portfolio: 'view-portfolio',
-  macro: 'view-macro', import: 'view-import', intel: 'view-intel',
+  macro: 'view-macro', import: 'view-import', intel: 'view-intel', settings: 'view-settings',
   compare: 'view-compare', store: 'view-store',
 };
 
@@ -2994,6 +3102,16 @@ function wire() {
   });
 
   $('#chat-send').onclick = () => sendChat();
+  $('#export-threads-json').onclick = () => exportThreads('json');
+  $('#export-threads-md').onclick = () => exportThreads('md');
+  $('#clear-threads').onclick = () => {
+    if (!confirm('Delete every stored conversation on this device? This cannot be undone.')) return;
+    saveThreads([]); setActiveThread(null); renderThreadList();
+    if ($('#export-status')) $('#export-status').textContent = 'All conversations deleted';
+  };
+  $('#backup-create').onclick = () => createBackup();
+  $('#backup-inspect-open').onclick = () => inspectBackup();
+  $('#carry-run').onclick = () => runCarry();
   $('#chat-new').onclick = () => { newThread(); openThread(activeThreadId()); };
   initDropZone();
   initVoice();
@@ -3018,6 +3136,7 @@ function wire() {
       if (v === 'intel') { loadIntel(); loadJobs(); loadTools(); loadAdmin(); loadUniverse(); loadMovers(); loadSectorBreadth();  loadSectors(); loadDiscover(); loadAdvisors(); loadNewsroom(); }
       if (v === 'store') { loadStore(); loadModels(); }
       if (v === 'macro') loadMacro();
+      if (v === 'settings') { loadSettings(); loadCarryRates(); }
     if (v === 'library') initLibrary();
     if (v === 'chat') setTimeout(() => chatEl('chat-input')?.focus(), 60);
     };

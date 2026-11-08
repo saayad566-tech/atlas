@@ -694,3 +694,16 @@ body.wall .broadcast-bar, body.wall .section-h .spacer, body.wall .section-h .bt
   .chatcompose { padding: 8px 10px 14px; }
   .chattools { gap: 8px; flex-wrap: wrap; }
 }
+
+/* ---- Motion: a short, consistent set of transitions ---------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  .view.active { animation: viewIn 200ms cubic-bezier(.2,.7,.3,1); }
+  @keyframes viewIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .scorecard { transition: border-color 160ms ease, transform 160ms ease; }
+  .scorecard:hover { border-color: var(--brand); transform: translateY(-1px); }
+  .btn, .navbtn, .segbtn, .threadrow { transition: background 140ms ease, color 140ms ease, border-color 140ms ease; }
+  .btn:active { transform: scale(.985); }
+  .chatlog .msg { animation: msgIn 220ms cubic-bezier(.2,.7,.3,1); }
+}
+/* The skip link and focus ring must never rely on colour alone. */
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
