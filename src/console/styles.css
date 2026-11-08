@@ -643,3 +643,54 @@ body.wall .broadcast-bar, body.wall .section-h .spacer, body.wall .section-h .bt
 .dropzone .hint { display: block; margin-bottom: 8px; font-size: 11.5px; }
 #chat-mic.listening { color: var(--negative); animation: pulse 1.1s ease-in-out infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+
+/* ---- Collapsible drawer on a phone --------------------------------------- */
+.navtoggle { display: none; }
+.navscrim { display: none; }
+
+@media (max-width: 900px) {
+  .navtoggle { display: inline-flex; flex: 0 0 auto; }
+  .navscrim {
+    display: block; position: fixed; inset: 0; z-index: 70;
+    background: rgba(6,10,16,.5); opacity: 0; pointer-events: none;
+    transition: opacity 180ms ease;
+  }
+  body.drawer-open .navscrim { opacity: 1; pointer-events: auto; }
+  /* The strip becomes a slide-over panel. */
+  .nav {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 250px; height: 100vh;
+    flex-direction: column; align-items: stretch; z-index: 80;
+    transform: translateX(-100%); transition: transform 220ms cubic-bezier(.2,.7,.3,1);
+    border-right: 1px solid var(--line); border-bottom: 0; padding: 14px 10px;
+    overflow-y: auto;
+  }
+  body.drawer-open .nav { transform: none; }
+  .nav .navbtn { width: 100%; text-align: left; padding: 10px 12px; border-radius: var(--radius-sm); }
+  .nav .input.sm { max-width: none !important; width: 100%; }
+}
+
+/* ---- Markdown tables and copy -------------------------------------------- */
+.mdtable { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12px; }
+.mdtable th, .mdtable td {
+  border: 1px solid var(--line); padding: 5px 8px; text-align: left; vertical-align: top;
+}
+.mdtable th { background: var(--surface-2); font-weight: 600; }
+.mdcodebox { position: relative; margin: 8px 0; }
+.mdcodebox .mdcopy {
+  position: absolute; top: 6px; right: 6px; font-size: 10.5px; padding: 3px 9px;
+  border-radius: 6px; cursor: pointer; background: var(--surface-1);
+  border: 1px solid var(--line); color: var(--ink-3);
+}
+.mdcodebox .mdcopy:hover { color: var(--brand); border-color: var(--brand); }
+.mdcodebox .mdcode { margin: 0; }
+
+/* The composer gained attach and voice controls; on a narrow screen the input must
+   give up width so every button stays reachable rather than pushed off the edge. */
+@media (max-width: 520px) {
+  .chatrow { gap: 6px; }
+  .chatrow .chatinput { min-width: 0; flex: 1 1 auto; font-size: 13px; padding: 10px 12px; }
+  .chatrow .btn { flex: 0 0 auto; padding: 10px 12px; font-size: 13px; }
+  .chatrow #chat-send { padding: 10px 14px; }
+  .chatcompose { padding: 8px 10px 14px; }
+  .chattools { gap: 8px; flex-wrap: wrap; }
+}

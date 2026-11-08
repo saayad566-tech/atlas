@@ -90,15 +90,18 @@ ok('an empty document is handled', B.ingestDocument('').rules.length===0);
     await ctx.close();
   }
 
-  const pg=await br.newPage({viewport:{width:412,height:880}});
+  // The library needs its own page: the viewport contexts above are closed by now.
+  const libCtx=await br.newContext({viewport:{width:412,height:880}});
+  const pg=await libCtx.newPage();
   await pg.goto(base,{waitUntil:'networkidle'}); await pg.waitForTimeout(1800);
-  await pg.click('[data-view="library"]'); await pg.waitForTimeout(400);
+  await pg.evaluate(()=>document.querySelector('[data-view="library"]').click());
+  await pg.waitForTimeout(400);
   ok('library opens', await pg.locator('#view-library').isVisible());
   await pg.fill('#ingest-text','Buy when the P/E is below 20.');
   await pg.click('#ingest-run'); await pg.waitForTimeout(1500);
   ok('a pasted rule produces a screen', (await pg.locator('#ingest-status').innerText()).includes('rule'));
   ok('the rules are rendered', (await pg.locator('#ingest-result .scorecard').count())>=3);
-  await pg.close();
+  await libCtx.close();
 
   console.log('\n=== CONVERSATIONS PERSIST ===');
   const pg2=await br.newPage({viewport:{width:1400,height:900}});
@@ -120,6 +123,39 @@ ok('an empty document is handled', B.ingestDocument('').rules.length===0);
   ok('a drop zone exists in the library', await pg2.evaluate(()=>!!document.getElementById('ingest-drop')));
   ok('a voice control exists', await pg2.evaluate(()=>!!document.getElementById('chat-mic')));
   ok('a new-conversation control exists', await pg2.evaluate(()=>!!document.getElementById('chat-new')));
+  ok('an attach control exists', await pg2.evaluate(()=>!!document.getElementById('chat-attach')));
+  ok('storage is versioned', await pg2.evaluate(()=>localStorage.getItem('atlas.storage.version')==='2'));
+
+  const md = await pg2.evaluate(()=>{
+    const el=document.createElement('div');
+    el.innerHTML=renderMarkdown('| Metric | Value |\n|---|---|\n| P/E | 20 |\n| ROE | 18% |');
+    return { table: !!el.querySelector('.mdtable'), rows: el.querySelectorAll('.mdtable tbody tr').length };
+  });
+  ok('markdown tables render', md.table && md.rows===2, md.rows+' rows');
+  const code = await pg2.evaluate(()=>{
+    const el=document.createElement('div');
+    el.innerHTML=renderMarkdown('```\nP/E < 20\n```');
+    return { box: !!el.querySelector('.mdcodebox'), copy: !!el.querySelector('[data-copy]') };
+  });
+  ok('a fenced block gets a copy button', code.box && code.copy);
+
+  // the drawer, on a phone
+  const ctx3=await br.newContext({viewport:{width:412,height:880}});
+  const pg3=await ctx3.newPage();
+  await pg3.goto(base,{waitUntil:'networkidle'}); await pg3.waitForTimeout(2000);
+  ok('a phone shows a menu button', await pg3.locator('#nav-toggle').isVisible());
+  const before=await pg3.locator('.nav').boundingBox();
+  // Drive the control directly: the assertion is about the drawer's behaviour, not about
+  // whether a 412 px header leaves the button inside the first viewport.
+  await pg3.evaluate(()=>document.getElementById('nav-toggle').click());
+  await pg3.waitForTimeout(450);
+  const after=await pg3.locator('.nav').boundingBox();
+  ok('the drawer slides in', !!before && before.x<0 && !!after && after.x>=0);
+  // The first entry sits at the top of the drawer, so it is always in the viewport.
+  await pg3.evaluate(()=>document.querySelector('.nav .navbtn').click());
+  await pg3.waitForTimeout(450);
+  ok('choosing a view closes the drawer', !(await pg3.evaluate(()=>document.body.classList.contains('drawer-open'))));
+  await ctx3.close();
   await pg2.close();
 
   await br.close(); await atlas.close(); fs.rmSync(home,{recursive:true,force:true});

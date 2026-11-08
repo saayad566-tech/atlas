@@ -42,6 +42,7 @@
   </div>
 </div>
 <div class="shell">
+<div class="navscrim" id="nav-scrim"></div>
   <nav class="nav">
     <button class="navbtn active" data-view="chat">Chat</button>
     <button class="navbtn" data-view="screener">Screener</button>
@@ -64,6 +65,7 @@
 
 <div class="main">
 <header class="topbar">
+  <button class="btn ghost navtoggle" id="nav-toggle" aria-label="Menu" aria-expanded="false">☰</button>
   <div class="brand"><span class="logo">S</span><span>Sift</span><small>local screener</small></div>
   <div class="searchwrap">
     <input id="search" class="search" type="search" placeholder="Search a company or symbol…  ( / )" autocomplete="off" aria-label="Search companies" />
@@ -93,6 +95,8 @@
         </div>
         <div class="chatrow">
           <textarea id="chat-input" class="chatinput" rows="1" placeholder="Ask about a company, the market, or any term…" aria-label="Your question"></textarea>
+          <input type="file" id="chat-file" accept=".txt,.md,.markdown,.csv,.json" hidden aria-label="Attach a text file" />
+          <button class="btn ghost" id="chat-attach" aria-label="Attach a file" title="Attach a text file">📎</button>
           <button class="btn ghost" id="chat-mic" aria-label="Voice input" title="Speak your question">🎤</button>
           <button class="btn primary" id="chat-send" aria-label="Send">Send</button>
         </div>

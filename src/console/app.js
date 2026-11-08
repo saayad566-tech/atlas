@@ -2997,6 +2997,12 @@ function wire() {
   $('#chat-new').onclick = () => { newThread(); openThread(activeThreadId()); };
   initDropZone();
   initVoice();
+  wireCopyButtons();
+  initDrawer();
+  initAttach();
+  migrateStorage();
+  $('#nav-toggle').onclick = () => toggleDrawer();
+  $('#chat-attach').onclick = () => $('#chat-file').click();
   $('#chat-mic').onclick = () => toggleVoice();
   $('#ingest-run').onclick = () => runIngest();
   $('#btn-back').onclick = () => showView('view-screener');
@@ -3326,12 +3332,49 @@ function renderMarkdown(text) {
   let out = '';
   let inList = false;
   let inCode = false;
+  let inTable = false;
+  let codeBuf = [];
   const closeList = () => { if (inList) { out += '</ul>'; inList = false; } };
+  const closeTable = () => { if (inTable) { out += '</tbody></table>'; inTable = false; } };
 
-  for (const raw of lines) {
-    const line = raw;
-    if (/^```/.test(line)) { closeList(); inCode = !inCode; out += inCode ? '<pre class="mdcode">' : '</pre>'; continue; }
-    if (inCode) { out += line + '\n'; continue; }
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (/^```/.test(line)) {
+      closeList(); closeTable();
+      if (inCode) {
+        // A fenced block gets a copy button, because a number or a rule is usually the
+        // reason someone wants the block.
+        const body = codeBuf.join('\n');
+        out += '<div class="mdcodebox"><button class="mdcopy" data-copy="'
+          + encodeURIComponent(body) + '" aria-label="Copy this block">Copy</button>'
+          + '<pre class="mdcode">' + body + '</pre></div>';
+        codeBuf = [];
+        inCode = false;
+      } else { inCode = true; }
+      continue;
+    }
+    if (inCode) { codeBuf.push(line); continue; }
+
+    // A pipe table: a header row followed by a separator row.
+    if (/^\s*\|/.test(line) && /^\s*\|[\s|:-]+\|?\s*$/.test(lines[i + 1] || '')) {
+      closeList(); closeTable();
+      const cells = (r) => r.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+      out += '<table class="mdtable"><thead><tr>'
+        + cells(line).map((c) => '<th>' + inline(c) + '</th>').join('') + '</tr></thead><tbody>';
+      inTable = true;
+      i++;
+      continue;
+    }
+    if (inTable) {
+      if (/^\s*\|/.test(line)) {
+        const cells = line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+        out += '<tr>' + cells.map((c) => '<td>' + inline(c) + '</td>').join('') + '</tr>';
+        continue;
+      }
+      closeTable();
+    }
+
     if (/^\s*[-*]\s+/.test(line)) {
       if (!inList) { out += '<ul>'; inList = true; }
       out += '<li>' + inline(line.replace(/^\s*[-*]\s+/, '')) + '</li>';
@@ -3345,17 +3388,37 @@ function renderMarkdown(text) {
     if (!line.trim()) { out += '<div class="mdgap"></div>'; continue; }
     out += '<div>' + inline(line) + '</div>';
   }
-  closeList();
-  if (inCode) out += '</pre>';
+  closeList(); closeTable();
+  if (inCode && codeBuf.length) out += '<pre class="mdcode">' + codeBuf.join('\n') + '</pre>';
 
-  function inline(s) {
-    return s
+  function inline(t) {
+    return t
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
       .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
       .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
   }
   return out;
+}
+
+/** The copy buttons are delegated once, so re-rendering never leaks handlers. */
+function wireCopyButtons() {
+  if (document.body.dataset.copyWired) return;
+  document.body.dataset.copyWired = '1';
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-copy]');
+    if (!b) return;
+    const text = decodeURIComponent(b.dataset.copy || '');
+    try {
+      await navigator.clipboard.writeText(text);
+      const old = b.textContent;
+      b.textContent = 'Copied';
+      setTimeout(() => { b.textContent = old; }, 1200);
+    } catch {
+      b.textContent = 'Copy failed';
+      setTimeout(() => { b.textContent = 'Copy'; }, 1200);
+    }
+  });
 }
 
 // ===========================================================================
@@ -3454,4 +3517,114 @@ function toggleVoice() {
       if (chatEl('chat-engine')) chatEl('chat-engine').textContent = 'Voice could not start';
     }
   }
+}
+
+// ===========================================================================
+// A collapsible navigation drawer for a phone. On a narrow screen the sidebar
+// becomes a slide-over that the menu button opens and any selection closes.
+// ===========================================================================
+function toggleDrawer() {
+  const btn = document.getElementById('nav-toggle');
+  const open = document.body.classList.toggle('drawer-open');
+  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function initDrawer() {
+  const nav = document.querySelector('.nav');
+  const btn = document.getElementById('nav-toggle');
+  const scrim = document.getElementById('nav-scrim');
+  if (!nav || !btn || !scrim || btn.dataset.wired) return;
+  btn.dataset.wired = '1';
+
+  const close = () => {
+    document.body.classList.remove('drawer-open');
+    btn.setAttribute('aria-expanded', 'false');
+  };
+  // The click is bound in wire(); this only sets up the scrim and the close rules.
+  scrim.onclick = close;
+  // Choosing a destination closes the drawer.
+  nav.addEventListener('click', (e) => {
+    if (e.target.closest('.navbtn')) close();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.body.classList.contains('drawer-open')) close();
+  });
+}
+
+// ===========================================================================
+// Attach a file to the conversation. The text of the file becomes the question's
+// context, so a pasted annual report can be asked about directly.
+// ===========================================================================
+function initAttach() {
+  const input = document.getElementById('chat-file');
+  const btn = document.getElementById('chat-attach');
+  if (!input || !btn || btn.dataset.wired) return;
+  btn.dataset.wired = '1';
+
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const eng = chatEl('chat-engine');
+    if (file.size > 400_000) {
+      if (eng) eng.textContent = `"${file.name}" is too large (limit 400,000 characters)`;
+      input.value = '';
+      return;
+    }
+    if (!/\.(txt|md|markdown|csv|json)$/i.test(file.name)) {
+      if (eng) eng.textContent = 'Attach a .txt, .md, .csv or .json file';
+      input.value = '';
+      return;
+    }
+    try {
+      const text = await file.text();
+      const box = chatEl('chat-input');
+      if (box) {
+        box.value = `About "${file.name}":\n\n${text.slice(0, 4000)}\n\n`;
+        box.style.height = 'auto';
+        box.style.height = Math.min(box.scrollHeight, 140) + 'px';
+        box.focus();
+      }
+      if (eng) eng.textContent = `Attached "${file.name}" — add your question and send`;
+    } catch (e) {
+      if (eng) eng.textContent = 'Could not read that file';
+    } finally { input.value = ''; }
+  };
+}
+
+// ===========================================================================
+// Storage migrations. A stored shape from an older version must be upgraded, not
+// discarded, so a user's conversations survive an update.
+// ===========================================================================
+const STORAGE_VERSION = 2;
+
+function migrateStorage() {
+  try {
+    const seen = Number(localStorage.getItem('atlas.storage.version') || '1');
+    if (seen >= STORAGE_VERSION) return;
+
+    // v1 -> v2: turns gained `engine` and `kind`; threads gained `title` and `at`.
+    const raw = localStorage.getItem('atlas.chat.threads.v1');
+    if (raw) {
+      let list;
+      try { list = JSON.parse(raw); } catch { list = []; }
+      if (Array.isArray(list)) {
+        const upgraded = list.map((t, i) => ({
+          id: t.id || 't' + (Date.now() + i),
+          title: t.title || 'Conversation',
+          at: t.at || Date.now(),
+          turns: Array.isArray(t.turns) ? t.turns.map((x) => ({
+            role: x.role === 'user' ? 'user' : 'atlas',
+            text: String(x.text ?? ''),
+            at: x.at || new Date().toISOString(),
+            engine: x.engine || 'deterministic',
+            kind: x.kind || 'unknown',
+            evidence: Array.isArray(x.evidence) ? x.evidence : [],
+            followUps: Array.isArray(x.followUps) ? x.followUps : [],
+          })) : [],
+        }));
+        localStorage.setItem('atlas.chat.threads.v1', JSON.stringify(upgraded));
+      }
+    }
+    localStorage.setItem('atlas.storage.version', String(STORAGE_VERSION));
+  } catch { /* a full or blocked store must not stop the app */ }
 }
