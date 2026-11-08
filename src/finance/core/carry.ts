@@ -53,13 +53,34 @@ const RATES: PolicyRate[] = [
 /** A standard lot, in units of the base currency. */
 const LOT = 100_000;
 
+/**
+ * Rates scraped from a central bank override the bundled table.
+ *
+ * The bundled values are a fallback, not the truth: when the RBI page is reachable its
+ * published rate is used instead, and the `asOf` says where it came from.
+ */
+const live = new Map<string, PolicyRate>();
+
+export function setLiveRate(currency: string, rate: number, centralBank: string, asOf: string): void {
+  const c = currency.toUpperCase();
+  if (!Number.isFinite(rate) || rate < 0 || rate > 25) return;
+  live.set(c, { currency: c, centralBank, rate, asOf });
+}
+
+export function clearLiveRates(): void { live.clear(); }
+
+export function liveRateCount(): number { return live.size; }
+
 export function policyRate(currency: string): PolicyRate | null {
   const c = currency.toUpperCase();
-  return RATES.find((r) => r.currency === c) ?? null;
+  return live.get(c) ?? RATES.find((r) => r.currency === c) ?? null;
 }
 
 export function allPolicyRates(): PolicyRate[] {
-  return [...RATES].sort((a, b) => b.rate - a.rate);
+  // A live rate replaces its bundled counterpart rather than appearing twice.
+  const merged = new Map(RATES.map((r) => [r.currency, r]));
+  for (const [c, r] of live) merged.set(c, r);
+  return [...merged.values()].sort((a, b) => b.rate - a.rate);
 }
 
 /**

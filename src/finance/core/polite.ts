@@ -35,12 +35,40 @@ export interface PoliteOptions {
   timeoutMs: number;
 }
 
+/**
+ * Fetch through curl.
+ *
+ * Node's built-in fetch does not read HTTPS_PROXY, so behind a proxy it fails with a bare
+ * "fetch failed" while curl succeeds. This is the fallback, not the first choice: the
+ * built-in path is used whenever it works.
+ */
+async function curlFetch(url: string, headers: Record<string, string>, timeoutMs: number):
+  Promise<{ status: number; body: string; etag: string | null; lastModified: string | null } | null> {
+  try {
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const run = promisify(execFile);
+    const args = ['-s', '-L', '--max-time', String(Math.ceil(timeoutMs / 1000)), '-D', '-', '-o', '-'];
+    for (const [k, v] of Object.entries(headers)) args.push('-H', `${k}: ${v}`);
+    args.push(url);
+    const { stdout } = await run('curl', args, { maxBuffer: 24 * 1024 * 1024 });
+    const split = stdout.indexOf('\r\n\r\n');
+    const headEnd = split === -1 ? stdout.indexOf('\n\n') : split;
+    const head = headEnd === -1 ? '' : stdout.slice(0, headEnd);
+    const body = headEnd === -1 ? stdout : stdout.slice(headEnd + (split === -1 ? 2 : 4));
+    const statusMatch = /^HTTP\/[\d.]+\s+(\d{3})/m.exec(head);
+    const etag = /^etag:\s*(.+)$/im.exec(head)?.[1]?.trim() ?? null;
+    const lastModified = /^last-modified:\s*(.+)$/im.exec(head)?.[1]?.trim() ?? null;
+    return { status: statusMatch ? Number(statusMatch[1]) : 0, body, etag, lastModified };
+  } catch { return null; }
+}
+
 const DEFAULTS: PoliteOptions = {
   userAgent: 'Atlas/3.1 (+https://github.com/saayad566-tech/atlas; personal research tool)',
   minIntervalMs: 1500,
   cacheTtlMs: 10 * 60_000,
   cacheDir: path.join(process.cwd(), 'data', 'cache'),
-  timeoutMs: 12_000,
+  timeoutMs: 25_000,
 };
 
 interface CacheEntry { at: number; etag: string | null; lastModified: string | null; body: string }
@@ -169,6 +197,21 @@ export class PoliteClient {
         retryAfterSec,
       };
     } catch (e) {
+      // The built-in fetch could not reach the network. Before giving up, try curl, which
+      // honours the proxy the environment sets.
+      const viaCurl = await curlFetch(url, headers, this.opts.timeoutMs);
+      if (viaCurl && viaCurl.status > 0) {
+        const entry: CacheEntry = { at: Date.now(), etag: viaCurl.etag, lastModified: viaCurl.lastModified, body: viaCurl.body };
+        if (viaCurl.status >= 200 && viaCurl.status < 300) this.writeCache(url, entry);
+        return {
+          ok: viaCurl.status >= 200 && viaCurl.status < 300,
+          status: viaCurl.status, body: viaCurl.body, notModified: viaCurl.status === 304,
+          cached: false, ms: Date.now() - started,
+          error: viaCurl.status >= 200 && viaCurl.status < 300 ? null
+            : `HTTP ${viaCurl.status}${viaCurl.status === 429 ? ' — rate limited, backing off' : ''}`,
+          retryAfterSec: null,
+        };
+      }
       // Offline or blocked: serve the cached copy if we have one, and say that is what happened.
       if (cached) {
         return { ok: true, status: 0, body: cached.body, notModified: false, cached: true, ms: Date.now() - started,

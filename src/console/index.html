@@ -151,6 +151,21 @@
       </div>
     </div>
 
+    <div class="section-h">Web scraping <span class="hint">read public pages politely, with the source shown for every value</span></div>
+    <div class="cards">
+      <div class="scorecard" style="grid-column: span 2">
+        <div class="t">PIPELINE</div>
+        <div class="d hint">Identifies itself honestly, obeys robots.txt, waits between requests, honours Retry-After, and reports a refusal as a refusal.</div>
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn sm primary" id="scrape-refresh-rates">Read live rates from RBI</button>
+          <button class="btn sm" id="scrape-read-all">Read every configured source</button>
+        </div>
+        <div class="hint" id="scrape-status" style="margin-top:6px"></div>
+      </div>
+    </div>
+    <div class="cards" id="scrape-sources"></div>
+    <div id="scrape-result"></div>
+
     <div class="section-h">Reference rates <span class="hint">bundled, dated, and named by the bank that sets them</span></div>
     <div class="cards" id="carry-rates"></div>
   </section>

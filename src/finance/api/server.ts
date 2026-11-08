@@ -70,7 +70,8 @@ import { coffeeScorecard, SCORECARD_LINES, verdictFor } from '../core/coffee';
 import { fetchNseBoard, fetchNseStatus, storeBoard, storedBoard } from '../core/nse';
 import { chatReply, chatGreeting } from '../core/chat';
 import { ingestDocument } from '../core/bookingest';
-import { carryFor, allPolicyRates } from '../core/carry';
+import { carryFor, allPolicyRates, setLiveRate, liveRateCount } from '../core/carry';
+import { scrapeSource, SCRAPE_SOURCES, parseRepoRate, parseExchangeRates } from '../core/scrape';
 import { createBackup, writeBackup, readBackup, restoreBackup, describeBackup } from '../core/backup';
 import { gutTest, positionSize, CHECKLIST } from '../core/gut';
 import { downloadModel, progressOf, directUrl } from '../core/modeldownload';
@@ -1557,6 +1558,44 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       // ---- back data: browse any stored date range ----
       // ---- newsroom: per-country market news, cached for offline reading ----
       // ---- trading sessions ----
+      // ---- the scraping pipeline ----
+      if (p === '/api/scrape/sources') {
+        return json(res, 200, { sources: SCRAPE_SOURCES.map((s) => ({
+          id: s.id, name: s.name, url: s.url, provides: s.provides, market: s.market,
+        })) });
+      }
+      if (p === '/api/scrape/read' && req.method === 'POST') {
+        const b = (await readBody(req)) as { id?: string; url?: string; maxAttempts?: number };
+        if (b.id) {
+          const r = await scrapeSource(b.id, { maxAttempts: b.maxAttempts ?? 2 });
+          return json(res, 200, r);
+        }
+        if (b.url) {
+          const { scrape } = await import('../core/scrape');
+          const r = await scrape(String(b.url), { maxAttempts: b.maxAttempts ?? 2 });
+          return json(res, 200, r);
+        }
+        return json(res, 400, { error: 'Give a source id or a url' });
+      }
+      // Read the RBI page and adopt the published policy rate and rupee rates.
+      if (p === '/api/scrape/rates/refresh' && req.method === 'POST') {
+        const r = await scrapeSource('rbi-rates', { maxAttempts: 2 });
+        if (!r.ok || !r.record) {
+          return json(res, 200, { ok: false, adopted: 0, error: r.error,
+            note: 'The RBI page could not be read, so the bundled reference rates remain in use.' });
+        }
+        const rate = parseRepoRate(r.record.text);
+        const fx = parseExchangeRates(r.record.text);
+        if (rate === null) {
+          return json(res, 200, { ok: false, adopted: 0,
+            error: 'the repo rate sentence was not found on the page',
+            note: 'The page layout may have changed; the bundled rate remains in use.' });
+        }
+        setLiveRate('INR', rate, 'Reserve Bank of India', r.record.fetchedAt.slice(0, 10));
+        return json(res, 200, { ok: true, adopted: 1, repoRate: rate, exchangeRates: fx,
+          liveRates: liveRateCount(), fetchedAt: r.record.fetchedAt,
+          note: 'The published rate now overrides the bundled reference value.' });
+      }
       // ---- forex carry from bundled policy rates ----
       if (p === '/api/carry/rates') {
         return json(res, 200, { rates: allPolicyRates(), note: 'Bundled reference rates; each names the central bank that sets it.' });

@@ -434,6 +434,90 @@ async function inspectBackup() {
   } catch (e) { if (status) status.textContent = 'That file is not an Atlas backup'; }
 }
 
+
+// ---- The scraping pipeline ------------------------------------------------
+async function loadScrapeSources() {
+  const el = $('#scrape-sources');
+  if (!el) return;
+  try {
+    const r = await api('/api/scrape/sources');
+    el.innerHTML = r.sources.map((s) => `<div class="scorecard">
+      <div class="t">${esc(s.market)}</div>
+      <div class="d" style="font-size:13px;font-weight:600">${esc(s.name)}</div>
+      <div class="d hint">${esc(s.provides)}</div>
+      <div class="d hint mono" style="font-size:10px;word-break:break-all;margin-top:4px">${esc(s.url)}</div>
+      <button class="btn sm" data-scrape="${esc(s.id)}" style="margin-top:6px">Read this source</button>
+    </div>`).join('');
+    el.querySelectorAll('[data-scrape]').forEach((b) => {
+      b.onclick = () => readScrapeSource(b.dataset.scrape);
+    });
+  } catch { el.innerHTML = ''; }
+}
+
+async function readScrapeSource(id) {
+  const status = $('#scrape-status');
+  const out = $('#scrape-result');
+  if (status) status.textContent = 'Reading…';
+  try {
+    const r = await api('/api/scrape/read', { method: 'POST', body: JSON.stringify({ id, maxAttempts: 2 }) });
+    if (!r.ok) {
+      if (status) status.textContent = r.error || 'Could not read that source';
+      if (out) out.innerHTML = '';
+      return;
+    }
+    const rec = r.record;
+    if (status) status.textContent = `Read in ${rec.ms} ms${rec.fromCache ? ' (from cache)' : ''}`;
+    if (out) {
+      const fieldRows = Object.entries(rec.fields || {}).map(([k, v]) => {
+        const value = Array.isArray(v)
+          ? `<table class="mdtable">${v.slice(0, 6).map((row) => `<tr>${row.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table>`
+          : `<div class="d mono" style="font-size:11.5px">${esc(String(v) || '—')}</div>`;
+        return `<div class="scorecard"><div class="t">${esc(k)}</div>${value}</div>`;
+      }).join('');
+      out.innerHTML = `<div class="section-h">What was read</div><div class="cards">`
+        + `<div class="scorecard"><div class="t">PAGE</div><div class="d" style="font-size:13px">${esc(rec.pageTitle || '(no title)')}</div>
+            <div class="d hint">${rec.stats.chars} characters · ${rec.stats.elements} elements</div>
+            ${rec.empty ? '<div class="d hint" style="color:var(--caution)">The page yielded no readable content — it may render in the browser</div>' : ''}</div>`
+        + fieldRows + `</div>`
+        + (rec.text ? `<div class="section-h">Page text</div><div class="scorecard"><div class="d" style="font-size:12px;line-height:1.6">${esc(rec.text.slice(0, 1200))}${rec.text.length > 1200 ? '…' : ''}</div></div>` : '');
+    }
+  } catch (e) {
+    if (status) status.textContent = 'Could not read that source';
+  }
+}
+
+async function refreshLiveRates() {
+  const status = $('#scrape-status');
+  if (status) status.textContent = 'Reading the RBI page…';
+  try {
+    const r = await api('/api/scrape/rates/refresh', { method: 'POST', body: '{}' });
+    if (status) {
+      status.textContent = r.ok
+        ? `Adopted the published repo rate: ${r.repoRate}% — the bundled value is no longer used`
+        : (r.error || 'Could not read the page') + '. ' + (r.note || '');
+    }
+    if (r.ok) { loadCarryRates(); loadSettings(); }
+  } catch { if (status) status.textContent = 'Could not reach the RBI page'; }
+}
+
+async function readAllSources() {
+  const status = $('#scrape-status');
+  try {
+    const list = await api('/api/scrape/sources');
+    let ok = 0, empty = 0, failed = 0;
+    for (const s of list.sources) {
+      if (status) status.textContent = `Reading ${s.name}…`;
+      try {
+        const r = await api('/api/scrape/read', { method: 'POST', body: JSON.stringify({ id: s.id, maxAttempts: 1 }) });
+        if (!r.ok) failed++;
+        else if (r.record.empty) empty++;
+        else ok++;
+      } catch { failed++; }
+    }
+    if (status) status.textContent = `${ok} read · ${empty} with no readable content · ${failed} unreachable`;
+  } catch { if (status) status.textContent = 'Could not list the sources'; }
+}
+
 async function loadSession() {
   const el = $('#session-badge');
   if (!el) return;
@@ -3112,6 +3196,8 @@ function wire() {
   $('#backup-create').onclick = () => createBackup();
   $('#backup-inspect-open').onclick = () => inspectBackup();
   $('#carry-run').onclick = () => runCarry();
+  $('#scrape-refresh-rates').onclick = () => refreshLiveRates();
+  $('#scrape-read-all').onclick = () => readAllSources();
   $('#chat-new').onclick = () => { newThread(); openThread(activeThreadId()); };
   initDropZone();
   initVoice();
@@ -3136,7 +3222,7 @@ function wire() {
       if (v === 'intel') { loadIntel(); loadJobs(); loadTools(); loadAdmin(); loadUniverse(); loadMovers(); loadSectorBreadth();  loadSectors(); loadDiscover(); loadAdvisors(); loadNewsroom(); }
       if (v === 'store') { loadStore(); loadModels(); }
       if (v === 'macro') loadMacro();
-      if (v === 'settings') { loadSettings(); loadCarryRates(); }
+      if (v === 'settings') { loadSettings(); loadCarryRates(); loadScrapeSources(); }
     if (v === 'library') initLibrary();
     if (v === 'chat') setTimeout(() => chatEl('chat-input')?.focus(), 60);
     };
