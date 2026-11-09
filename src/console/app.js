@@ -558,6 +558,36 @@ async function readAllSources() {
   } catch { if (status) status.textContent = 'Could not list the sources'; }
 }
 
+
+// ---- Long history and corporate actions -----------------------------------
+async function runHistory() {
+  const sym = ($('#history-symbol')?.value || '').trim().toUpperCase();
+  const range = $('#history-range')?.value || 'max';
+  const status = $('#history-status');
+  const out = $('#history-result');
+  if (!sym) { if (status) status.textContent = 'Give a symbol, e.g. RELIANCE.NS'; return; }
+  if (status) status.textContent = 'Fetching…';
+  if (out) out.innerHTML = '';
+  try {
+    const r = await api(`/api/bars/${encodeURIComponent(sym)}?range=${encodeURIComponent(range)}`);
+    if (r.error) { if (status) status.textContent = r.error; return; }
+    if (status) status.textContent = `${r.bars} bars · ${r.dividends} dividends · ${r.splits} splits`;
+    const acts = (r.actions || []).slice(0, 12);
+    if (out) {
+      out.innerHTML = `<div class="cards">
+        <div class="scorecard"><div class="t">BARS</div><div class="d big">${nf.format(r.bars)}</div>
+          <div class="d hint">${esc(r.from || '—')} → ${esc(r.to || '—')}</div></div>
+        <div class="scorecard"><div class="t">DIVIDENDS</div><div class="d big">${r.dividends}</div>
+          <div class="d hint">${r.splits} split${r.splits === 1 ? '' : 's'} recorded</div></div>
+      </div>`
+      + (acts.length ? `<div class="section-h">Corporate actions</div>
+        <table class="answer-table"><thead><tr><th>Date</th><th>Kind</th><th>Value</th></tr></thead><tbody>`
+        + acts.map((a) => `<tr><td>${esc(a.date)}</td><td>${esc(a.kind)}</td><td>${a.kind === 'split' ? a.value + '×' : a.value}</td></tr>`).join('')
+        + `</tbody></table>` : '');
+    }
+  } catch (e) { if (status) status.textContent = 'Could not fetch that history'; }
+}
+
 async function loadSession() {
   const el = $('#session-badge');
   if (!el) return;
@@ -3238,6 +3268,7 @@ function wire() {
   $('#carry-run').onclick = () => runCarry();
   $('#scrape-refresh-rates').onclick = () => refreshLiveRates();
   $('#scrape-read-all').onclick = () => readAllSources();
+  $('#history-run').onclick = () => runHistory();
   $('#chat-new').onclick = () => { newThread(); openThread(activeThreadId()); };
   initDropZone();
   initVoice();

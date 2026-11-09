@@ -165,6 +165,25 @@
       </div>
     </div>
 
+    <div class="section-h">History and events <span class="hint">long price history and every dividend and split the source publishes</span></div>
+    <div class="cards">
+      <div class="scorecard" style="grid-column: span 2">
+        <div class="t">BACKFILL</div>
+        <div class="d hint">Pulls the whole listed history for a symbol in one request and stores it on this device.</div>
+        <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+          <input id="history-symbol" class="input sm" placeholder="RELIANCE.NS" aria-label="Symbol" />
+          <select id="history-range" class="input sm" aria-label="Range">
+            <option value="max">All history</option><option value="10y">10 years</option>
+            <option value="5y">5 years</option><option value="2y">2 years</option>
+            <option value="1y">1 year</option>
+          </select>
+          <button class="btn sm primary" id="history-run">Fetch</button>
+        </div>
+        <div class="hint" id="history-status" style="margin-top:6px"></div>
+        <div id="history-result" style="margin-top:8px"></div>
+      </div>
+    </div>
+
     <div class="section-h">Web scraping <span class="hint">read public pages politely, with the source shown for every value</span></div>
     <div class="cards">
       <div class="scorecard" style="grid-column: span 2">

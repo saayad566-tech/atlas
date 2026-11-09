@@ -1,6 +1,6 @@
 {
   "name": "atlas",
-  "version": "3.11.0",
+  "version": "3.12.0",
   "private": true,
   "type": "commonjs",
   "description": "Local-first multi-asset investment analysis: stocks, ETFs, forex and crypto across nine markets, offline by default.",
@@ -14,7 +14,7 @@
     "dev": "tsx src/gateway.ts",
     "verify:deep": "node scripts/verify-deep.js",
     "verify:ui": "node scripts/verify-ui.js",
-    "verify:universe": "node scripts/verify-universe-bundle.js",
+    "verify:universe": "node scripts/verify-universe.js",
     "restore": "bash scripts/restore-deps.sh",
     "verify:prod": "node scripts/verify-prod.js",
     "verify:import": "node scripts/verify-import.js",

@@ -51,7 +51,7 @@ import { fetchSecBulkManifest, syncBulkManifest, parseCompanyTickers } from '../
 import { briefCompany, briefMarket } from '../core/briefing';
 import { addEntry, listJournal, closeEntry, journalScorecard } from '../core/journal';
 import { trendingSectors, rankCandidates, peerPercentiles } from '../core/discover';
-import { metricHistory, earningsSurprises } from '../core/history';
+import { metricHistory, earningsSurprises, backfillSymbol, historySummary, actionsFor } from '../core/history';
 import { loadSeries, backtest } from '../core/backtest';
 import { corporateTimeline, insiderFlows } from '../core/corporate';
 import { companyTruth, marketTruth } from '../core/datatruth';
@@ -2253,6 +2253,27 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
         if (!country) return json(res, 400, { error: 'No market selected.' });
         const r = await fetchWorldBank(db.db, country);
         return json(res, 200, { ...r, country });
+      }
+
+      // ---- long price history and corporate actions (distinct from metric history) ----
+      if (p.startsWith('/api/bars/') && p !== '/api/bars/summary') {
+        const sym = decodeURIComponent(p.replace('/api/bars/', ''));
+        if (!sym) return json(res, 400, { error: 'Give a symbol' });
+        const q = url.searchParams.get('range') ?? 'max';
+        const allowed = ['max', '10y', '5y', '2y', '1y', '6mo', '3mo', '1mo'];
+        const range = (allowed.includes(q) ? q : 'max') as 'max';
+        try {
+          const r = await backfillSymbol(db.db, sym, range);
+          return json(res, 200, { ...r, actions: actionsFor(db.db, sym).slice(0, 40) });
+        } catch (e) {
+          return json(res, 200, { symbol: sym, bars: 0, stored: 0, error:
+            e instanceof Error ? e.message.slice(0, 160) : 'the backfill failed' });
+        }
+      }
+      if (p === '/api/bars/summary') {
+        const sym = url.searchParams.get('symbol') ?? '';
+        if (!sym) return json(res, 400, { error: 'Give a symbol' });
+        return json(res, 200, { symbol: sym, summary: historySummary(db.db, sym), actions: actionsFor(db.db, sym).slice(0, 40) });
       }
 
       // ---- live quotes (rich: change, day range, volume, as-of) ----
