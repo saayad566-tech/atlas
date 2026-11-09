@@ -52,6 +52,7 @@ import { briefCompany, briefMarket } from '../core/briefing';
 import { addEntry, listJournal, closeEntry, journalScorecard } from '../core/journal';
 import { trendingSectors, rankCandidates, peerPercentiles } from '../core/discover';
 import { metricHistory, earningsSurprises, backfillSymbol, historySummary, actionsFor } from '../core/history';
+import { startBackfill, stepBackfill, progress as backfillProgress, recentBackfill, cancelBackfill } from '../core/backfill';
 import { loadSeries, backtest } from '../core/backtest';
 import { corporateTimeline, insiderFlows } from '../core/corporate';
 import { companyTruth, marketTruth } from '../core/datatruth';
@@ -2254,6 +2255,28 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
         const r = await fetchWorldBank(db.db, country);
         return json(res, 200, { ...r, country });
       }
+
+      // ---- bulk backfill: history for many symbols, resumable ----
+      if (p === '/api/backfill/start' && req.method === 'POST') {
+        const b = (await readBody(req)) as { symbols?: string[]; range?: string; skipKnown?: boolean };
+        let list = Array.isArray(b.symbols) ? b.symbols : [];
+        if (!list.length) {
+          // No list given: take the largest companies in the active market.
+          try {
+            list = (db.db.prepare('SELECT symbol FROM companies ORDER BY market_cap DESC LIMIT 50').all() as Array<{ symbol: string }>)
+              .map((r) => r.symbol);
+          } catch { list = []; }
+        }
+        if (!list.length) return json(res, 400, { error: 'Give at least one symbol, or seed the market first' });
+        return json(res, 200, startBackfill(db.db, list, { range: b.range ?? 'max', skipKnown: b.skipKnown !== false }));
+      }
+      if (p === '/api/backfill/step' && req.method === 'POST') {
+        const b = (await readBody(req)) as { limit?: number };
+        return json(res, 200, await stepBackfill(db.db, Math.min(Math.max(Number(b.limit ?? 3), 1), 10)));
+      }
+      if (p === '/api/backfill/progress') return json(res, 200, backfillProgress());
+      if (p === '/api/backfill/recent') return json(res, 200, { recent: recentBackfill(db.db, 20) });
+      if (p === '/api/backfill/cancel' && req.method === 'POST') { cancelBackfill(); return json(res, 200, backfillProgress()); }
 
       // ---- long price history and corporate actions (distinct from metric history) ----
       if (p.startsWith('/api/bars/') && p !== '/api/bars/summary') {

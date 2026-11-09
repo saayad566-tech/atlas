@@ -1,6 +1,6 @@
 # Atlas — Full Product Requirements and Delivery Report
 
-**Version 3.12.0** · 9 November 2026 · Status: as-built
+**Version 3.13.0** · 9 November 2026 · Status: as-built
 **This document supersedes `docs/PRD.md`.** It covers what Atlas is, what works, what does
 not, and the status of every instruction given during the build.
 
@@ -331,7 +331,7 @@ P/E was never known.
 |---|---|---|---|
 | 1 | Per-symbol live quotes rate-limited from shared IPs | Yahoo returns 429. NSE board works; per-stock quotes need deeper session priming or a licensed feed | a licensed per-symbol feed |
 | 2 | ~~Forex carry unimplemented~~ | **Closed in 3.9.0** — a bundled table of 12 policy rates, each naming its central bank and the date it took effect, with the differential and annual carry on a standard lot. The date is shown so the figure is never mistaken for live | — |
-| 3 | ETF holdings absent | no free constituent feed | parse issuer pages, or ship a bundle (the universe now carries 140,322 instruments, but not fund constituents) |
+| 3 | ETF **holdings** absent | **The ETF list itself is closed in 3.13.0** — 4,023 funds harvested from the public Yahoo lookup and shipped as a bundle. What is still missing is each fund's constituent list: no free feed for it | parse issuer pages, or ship a constituents bundle |
 | 4 | ~~History depth 4–5 years~~ | **Closed in 3.12.0** — a long-history backfill pulls the whole listed span in one request (verified: RELIANCE.NS from 1995, 372 bars) plus every dividend and split | — |
 | 5 | Intent recognition not 100% | `ask.ts` covers 7 intents by rule; anything outside falls back deterministically | measure misroutes before claiming accuracy |
 | 6 | ~~Cloud sync is an interface, not a service~~ | **Closed differently in 3.9.0** — redundancy without a server: the whole local state exports to one compressed file the user owns and restores from it, with path-traversal refused. A hosted sync endpoint would still need a server | — |

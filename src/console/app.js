@@ -588,6 +588,65 @@ async function runHistory() {
   } catch (e) { if (status) status.textContent = 'Could not fetch that history'; }
 }
 
+
+// ---- Bulk backfill --------------------------------------------------------
+async function renderBackfillProgress(p) {
+  const status = $('#backfill-status');
+  const bar = $('#backfill-bar');
+  if (status) {
+    status.textContent = p.running
+      ? `${p.done} done · ${p.failed} failed · ${p.remaining} remaining · ${nf.format(p.bars)} bars stored`
+      : (p.queued ? `Finished: ${p.done} done, ${p.failed} failed` : 'Idle');
+  }
+  if (bar) {
+    const pct = p.queued ? Math.round(((p.done + p.failed) / p.queued) * 100) : 0;
+    bar.innerHTML = p.queued
+      ? `<div style="height:6px;background:var(--surface-2);border-radius:999px;overflow:hidden">
+           <div style="height:100%;width:${pct}%;background:var(--brand);transition:width 240ms"></div></div>`
+      : '';
+  }
+}
+
+async function loadBackfillRecent() {
+  const el = $('#backfill-recent');
+  if (!el) return;
+  try {
+    const r = await api('/api/backfill/recent');
+    if (!r.recent?.length) { el.innerHTML = ''; return; }
+    el.innerHTML = `<table class="answer-table"><thead><tr><th>Symbol</th><th>Bars</th><th>Result</th></tr></thead><tbody>`
+      + r.recent.slice(0, 10).map((x) => `<tr><td>${esc(x.symbol)}</td><td>${nf.format(x.bars)}</td>
+          <td>${x.error ? `<span style="color:var(--caution)">${esc(String(x.error).slice(0, 34))}</span>` : 'stored'}</td></tr>`).join('')
+      + `</tbody></table>`;
+  } catch { el.innerHTML = ''; }
+}
+
+async function runBackfill() {
+  const status = $('#backfill-status');
+  if (status) status.textContent = 'Starting…';
+  try {
+    const p = await api('/api/backfill/start', { method: 'POST', body: JSON.stringify({ range: 'max' }) });
+    await renderBackfillProgress(p);
+    await continueBackfill();
+  } catch (e) { if (status) status.textContent = 'Could not start the backfill'; }
+}
+
+async function continueBackfill() {
+  const status = $('#backfill-status');
+  // Bounded: each step handles three symbols, so the page never blocks for long.
+  for (let i = 0; i < 20; i++) {
+    const p = await api('/api/backfill/step', { method: 'POST', body: JSON.stringify({ limit: 3 }) });
+    await renderBackfillProgress(p);
+    if (!p.running || p.remaining === 0) break;
+  }
+  await loadBackfillRecent();
+  if (status) status.textContent += ' — press Continue for more';
+}
+
+async function stopBackfill() {
+  try { await api('/api/backfill/cancel', { method: 'POST', body: '{}' }); } catch { /* ignore */ }
+  await renderBackfillProgress(await api('/api/backfill/progress'));
+}
+
 async function loadSession() {
   const el = $('#session-badge');
   if (!el) return;
@@ -3269,6 +3328,9 @@ function wire() {
   $('#scrape-refresh-rates').onclick = () => refreshLiveRates();
   $('#scrape-read-all').onclick = () => readAllSources();
   $('#history-run').onclick = () => runHistory();
+  $('#backfill-run').onclick = () => runBackfill();
+  $('#backfill-more').onclick = () => continueBackfill();
+  $('#backfill-stop').onclick = () => stopBackfill();
   $('#chat-new').onclick = () => { newThread(); openThread(activeThreadId()); };
   initDropZone();
   initVoice();
