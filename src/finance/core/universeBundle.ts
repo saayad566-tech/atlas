@@ -5,6 +5,7 @@
 // real universe before any network call, and screening has something to screen.
 import fs from 'node:fs';
 import path from 'node:path';
+import { gunzipSync } from 'node:zlib';
 
 export interface UniverseCompany {
   symbol: string;
@@ -34,11 +35,28 @@ function dataDir(): string {
   return candidates[1]!;
 }
 
+/**
+ * Read a bundle file, gzipped or plain.
+ *
+ * The larger bundles ship compressed so they fit within a repository file limit; the reader
+ * accepts either form so an uncompressed bundle still works.
+ */
+function readBundle(file: string): BundleFile {
+  const raw = fs.readFileSync(file);
+  const text = file.endsWith('.gz') ? gunzipSync(raw).toString('utf8') : raw.toString('utf8');
+  return JSON.parse(text) as BundleFile;
+}
+
+/** Bundle files, with .gz and .json treated alike. */
+function bundleFiles(dir: string): string[] {
+  return fs.readdirSync(dir).filter((f) => f.endsWith('.json') || f.endsWith('.json.gz'));
+}
+
 export function bundledMarkets(): Array<{ market: string; count: number }> {
   try {
     const dir = dataDir();
-    return fs.readdirSync(dir).filter((f) => f.endsWith('.json')).map((f) => {
-      const j = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as BundleFile;
+    return bundleFiles(dir).map((f) => {
+      const j = readBundle(path.join(dir, f));
       return { market: j.market, count: j.count };
     }).sort((a, b) => a.market.localeCompare(b.market));
   } catch { return []; }
@@ -49,8 +67,12 @@ export function loadUniverse(market: string): UniverseCompany[] {
   const cached = CACHE.get(code);
   if (cached) return cached;
   try {
-    const file = path.join(dataDir(), `${code}.json`);
-    const j = JSON.parse(fs.readFileSync(file, 'utf8')) as BundleFile;
+    // Accept a compressed bundle when one ships, and fall back to the plain file.
+    const dir = dataDir();
+    const plain = path.join(dir, `${code}.json`);
+    const gz = `${plain}.gz`;
+    const file = fs.existsSync(gz) ? gz : plain;
+    const j = readBundle(file);
     const out = j.companies.map((c) => ({
       symbol: c.s, name: c.n, sector: c.sec, industry: c.ind,
       country: c.c, currency: c.cur, marketCap: c.cap, website: c.w, isin: c.isin,
