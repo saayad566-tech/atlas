@@ -68,7 +68,8 @@ import { countryMarkets } from '../core/markets';
 import { analyseInstrument } from '../core/instrument';
 import { coffeeScorecard, SCORECARD_LINES, verdictFor } from '../core/coffee';
 import { fetchNseBoard, fetchNseStatus, storeBoard, storedBoard } from '../core/nse';
-import { chatReply, chatGreeting } from '../core/chat';
+import { chatReply, chatGreeting, livePrices } from '../core/chat2';
+import { fetchQuote, fetchQuotes } from '../core/quotes';
 import { ingestDocument } from '../core/bookingest';
 import { carryFor, allPolicyRates, setLiveRate, liveRateCount } from '../core/carry';
 import { scrapeSource, SCRAPE_SOURCES, parseRepoRate, parseExchangeRates } from '../core/scrape';
@@ -1669,13 +1670,14 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
         return json(res, 200, chatGreeting(n));
       }
       if (p === '/api/chat' && req.method === 'POST') {
-        const b = (await readBody(req)) as { question?: string; mode?: 'fast' | 'thinking'; symbol?: string };
+        const b = (await readBody(req)) as { question?: string; mode?: 'fast' | 'thinking'; symbol?: string; context?: { symbol?: string } };
         const question = String(b.question ?? '').slice(0, 2000);
         if (!question.trim()) return json(res, 400, { error: 'Ask a question' });
         const mode = b.mode === 'thinking' ? 'thinking' : 'fast';
         const reply = chatReply(db.db, question, {
           mode,
           ...(b.symbol ? { symbol: String(b.symbol) } : {}),
+          ...(b.context ? { context: b.context } : {}),
         });
         // Thinking mode additionally consults the local model when one is installed. The
         // deterministic answer is never discarded: the model reply is appended and labelled.
@@ -2251,6 +2253,19 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
         if (!country) return json(res, 400, { error: 'No market selected.' });
         const r = await fetchWorldBank(db.db, country);
         return json(res, 200, { ...r, country });
+      }
+
+      // ---- live quotes (rich: change, day range, volume, as-of) ----
+      if (p === '/api/quotes/batch' && req.method === 'POST') {
+        const b = (await readBody(req)) as { symbols?: string[] };
+        const list = Array.isArray(b.symbols) ? b.symbols.slice(0, 25) : [];
+        if (!list.length) return json(res, 400, { error: 'Give at least one symbol' });
+        return json(res, 200, await fetchQuotes(list));
+      }
+      if (p.startsWith('/api/quotes/symbol/')) {
+        const sym = decodeURIComponent(p.replace('/api/quotes/symbol/', ''));
+        if (!sym) return json(res, 400, { error: 'Give a symbol' });
+        return json(res, 200, await fetchQuote(sym));
       }
 
       // ---- quotes (Yahoo, free) ----

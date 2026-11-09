@@ -707,3 +707,32 @@ body.wall .broadcast-bar, body.wall .section-h .spacer, body.wall .section-h .bt
 }
 /* The skip link and focus ring must never rely on colour alone. */
 :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
+
+/* ---- Grouped sidebar ----------------------------------------------------- */
+.navgroup { display: flex; flex-direction: column; gap: 1px; margin-bottom: 10px; }
+.navgroup-label {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--ink-3); padding: 2px 12px 4px;
+}
+.navgroup-tools { margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line-soft); }
+.navtools { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 4px 0; }
+.navtools .input.sm { flex: 1 1 100%; max-width: none; }
+.navtools .btn.sm { flex: 0 0 auto; }
+.navtools .chip { flex: 0 0 auto; }
+@media (max-width: 900px) {
+  .navgroup { flex-direction: row; flex-wrap: nowrap; margin-bottom: 0; }
+  .navgroup-label { display: none; }
+  .navgroup-tools { margin-left: auto; border-top: 0; padding-top: 0; }
+  .navtools { flex-wrap: nowrap; padding: 0; }
+  .navtools .input.sm { flex: 0 0 auto; max-width: 130px; }
+}
+
+/* ---- Rich answer blocks -------------------------------------------------- */
+.answer-table { width: 100%; border-collapse: collapse; margin: 8px 0 2px; font-size: 11.5px; }
+.answer-table th, .answer-table td { border: 1px solid var(--line); padding: 4px 7px; text-align: left; }
+.answer-table th { background: var(--surface-2); font-weight: 600; font-size: 10.5px; }
+.answer-table td { font-variant-numeric: tabular-nums; }
+.answer-table tr:nth-child(even) td { background: color-mix(in srgb, var(--surface-2) 55%, transparent); }
+.answer-list { margin: 7px 0 2px; padding-left: 17px; }
+.answer-list li { margin-bottom: 3px; font-size: 13px; }
+.msg.atlas .bubble .answer-table { border-radius: 6px; overflow: hidden; }

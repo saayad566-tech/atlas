@@ -44,23 +44,38 @@ export interface PoliteOptions {
  */
 async function curlFetch(url: string, headers: Record<string, string>, timeoutMs: number):
   Promise<{ status: number; body: string; etag: string | null; lastModified: string | null } | null> {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const { readFileSync, unlinkSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { tmpdir } = await import('node:os');
+  const { randomBytes } = await import('node:crypto');
+  const run = promisify(execFile);
+
+  const headerFile = join(tmpdir(), `atlas-h-${randomBytes(5).toString('hex')}.txt`);
   try {
-    const { execFile } = await import('node:child_process');
-    const { promisify } = await import('node:util');
-    const run = promisify(execFile);
-    const args = ['-s', '-L', '--max-time', String(Math.ceil(timeoutMs / 1000)), '-D', '-', '-o', '-'];
+    const args = ['-s', '-L', '--max-time', String(Math.ceil(timeoutMs / 1000)),
+      '-D', headerFile, '-o', '-', '-w', '\n%{http_code}'];
     for (const [k, v] of Object.entries(headers)) args.push('-H', `${k}: ${v}`);
     args.push(url);
-    const { stdout } = await run('curl', args, { maxBuffer: 24 * 1024 * 1024 });
-    const split = stdout.indexOf('\r\n\r\n');
-    const headEnd = split === -1 ? stdout.indexOf('\n\n') : split;
-    const head = headEnd === -1 ? '' : stdout.slice(0, headEnd);
-    const body = headEnd === -1 ? stdout : stdout.slice(headEnd + (split === -1 ? 2 : 4));
-    const statusMatch = /^HTTP\/[\d.]+\s+(\d{3})/m.exec(head);
-    const etag = /^etag:\s*(.+)$/im.exec(head)?.[1]?.trim() ?? null;
-    const lastModified = /^last-modified:\s*(.+)$/im.exec(head)?.[1]?.trim() ?? null;
-    return { status: statusMatch ? Number(statusMatch[1]) : 0, body, etag, lastModified };
+
+    const { stdout } = await run('curl', args, { maxBuffer: 32 * 1024 * 1024 });
+    // The body is everything before the status code curl appended.
+    const nl = stdout.lastIndexOf('\n');
+    const status = Number(stdout.slice(nl + 1).trim()) || 0;
+    const body = nl === -1 ? stdout : stdout.slice(0, nl);
+
+    let head = '';
+    try { head = readFileSync(headerFile, 'utf8'); } catch { head = ''; }
+    // With -L there is one header block per hop; the last one belongs to the final response.
+    const blocks = head.split(/\r?\n\r?\n/).filter((b) => /^HTTP\//i.test(b));
+    const last = blocks[blocks.length - 1] ?? '';
+    const etag = /^etag:\s*(.+)$/im.exec(last)?.[1]?.trim() ?? null;
+    const lastModified = /^last-modified:\s*(.+)$/im.exec(last)?.[1]?.trim() ?? null;
+
+    return { status, body, etag, lastModified };
   } catch { return null; }
+  finally { try { unlinkSync(headerFile); } catch { /* already gone */ } }
 }
 
 const DEFAULTS: PoliteOptions = {

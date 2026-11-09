@@ -1,6 +1,6 @@
 # Atlas — Full Product Requirements and Delivery Report
 
-**Version 3.10.0** · 9 November 2026 · Status: as-built
+**Version 3.11.0** · 9 November 2026 · Status: as-built
 **This document supersedes `docs/PRD.md`.** It covers what Atlas is, what works, what does
 not, and the status of every instruction given during the build.
 

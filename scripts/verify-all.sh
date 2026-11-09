@@ -82,6 +82,7 @@ run nse       verify-nse.js
 run chat-ui   verify-chat-ui.js
 run complete  verify-completion.js
 run scrape    verify-scrape.js
+run chat2     verify-chat2.js
 run provenance verify-provenance.js
 run failover  verify-failover.js
 run adapters  verify-adapters.js

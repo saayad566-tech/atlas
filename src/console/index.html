@@ -44,24 +44,38 @@
 <div class="shell">
 <div class="navscrim" id="nav-scrim"></div>
   <nav class="nav">
-    <button class="navbtn active" data-view="chat">Chat</button>
-    <button class="navbtn" data-view="screener">Screener</button>
-    <button class="navbtn" data-view="watchlist">Watchlist</button>
-    <button class="navbtn" data-view="rank">Rank</button>
-    <button class="navbtn" data-view="portfolio">Portfolio</button>
-    <button class="navbtn" data-view="macro">Macro</button>
-    <button class="navbtn" data-view="intel">Intelligence</button>
-    <input id="global-search" class="input sm" placeholder="Search any stock…" aria-label="Search stocks" style="max-width:220px" />
-    <button class="btn sm ghost" id="btn-format" title="Toggle crore / million" aria-label="Toggle number format">₹Cr</button>
-    <button class="btn sm ghost" id="btn-help" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">?</button>
-    <select id="asset-switch" class="input sm" aria-label="Asset class" title="Stocks, ETFs, forex or crypto"></select>
-    <span class="chip" id="session-badge" title="Trading session" hidden></span>
-    <select id="market-select" class="input sm" aria-label="Market" title="Download and switch country bundles"></select>
-    <button class="navbtn" data-view="compare">Compare</button>
-    <button class="navbtn" data-view="store">AI Store</button>
-    <button class="navbtn" data-view="library">Library</button>
-    <button class="navbtn" data-view="settings">Settings</button>
-    <button class="navbtn" data-view="import">Import</button>
+    <div class="navgroup"><span class="navgroup-label">Converse</span>
+      <button class="navbtn active" data-view="chat">Chat</button>
+      <button class="navbtn" data-view="library">Library</button>
+    </div>
+    <div class="navgroup"><span class="navgroup-label">Analyse</span>
+      <button class="navbtn" data-view="screener">Screener</button>
+      <button class="navbtn" data-view="rank">Rank</button>
+      <button class="navbtn" data-view="compare">Compare</button>
+      <button class="navbtn" data-view="intel">Intelligence</button>
+      <button class="navbtn" data-view="macro">Macro</button>
+    </div>
+    <div class="navgroup"><span class="navgroup-label">Track</span>
+      <button class="navbtn" data-view="watchlist">Watchlist</button>
+      <button class="navbtn" data-view="portfolio">Portfolio</button>
+    </div>
+    <div class="navgroup"><span class="navgroup-label">Data</span>
+      <button class="navbtn" data-view="import">Import</button>
+      <button class="navbtn" data-view="store">AI Store</button>
+    </div>
+    <div class="navgroup"><span class="navgroup-label">System</span>
+      <button class="navbtn" data-view="settings">Settings</button>
+    </div>
+    <div class="navgroup navgroup-tools">
+      <input id="global-search" class="input sm" placeholder="Search any stock…" aria-label="Search stocks" />
+      <div class="navtools">
+        <button class="btn sm ghost" id="btn-format" title="Toggle crore / million" aria-label="Toggle number format">₹Cr</button>
+        <button class="btn sm ghost" id="btn-help" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">?</button>
+        <select id="asset-switch" class="input sm" aria-label="Asset class" title="Stocks, ETFs, forex or crypto"></select>
+        <select id="market-select" class="input sm" aria-label="Market" title="Download and switch country bundles"></select>
+        <span class="chip" id="session-badge" title="Trading session" hidden></span>
+      </div>
+    </div>
   </nav>
 
 <div class="main">

@@ -140,7 +140,7 @@ async function loadListings() {
 
 
 // ---- Chat: the primary surface --------------------------------------------
-const chatState = { mode: 'fast', turns: [], busy: false };
+const chatState = { mode: 'fast', turns: [], busy: false, context: null };
 
 function chatEl(id) { return document.getElementById(id); }
 
@@ -161,6 +161,44 @@ function renderTurn(t) {
   // interpreted as markup.
   if (isUser) bub.textContent = t.text;
   else bub.innerHTML = renderMarkdown(t.text);
+
+  if (!isUser && Array.isArray(t.blocks) && t.blocks.length) {
+    for (const b of t.blocks) {
+      if (b.type === 'table' && b.headers && b.rows) {
+        const tbl = document.createElement('table');
+        tbl.className = 'answer-table';
+        const thead = document.createElement('thead');
+        const htr = document.createElement('tr');
+        for (const hcell of b.headers) {
+          const th = document.createElement('th');
+          th.textContent = hcell;
+          htr.appendChild(th);
+        }
+        thead.appendChild(htr); tbl.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        for (const row of b.rows) {
+          const tr = document.createElement('tr');
+          for (const cell of row) {
+            const td = document.createElement('td');
+            td.textContent = cell;
+            tr.appendChild(td);
+          }
+          tbody.appendChild(tr);
+        }
+        tbl.appendChild(tbody);
+        bub.appendChild(tbl);
+      } else if (b.type === 'list' && Array.isArray(b.items)) {
+        const ul = document.createElement('ul');
+        ul.className = 'answer-list';
+        for (const item of b.items) {
+          const li = document.createElement('li');
+          li.textContent = item;
+          ul.appendChild(li);
+        }
+        bub.appendChild(ul);
+      }
+    }
+  }
 
   if (!isUser) {
     const meta = document.createElement('span');
@@ -220,9 +258,11 @@ async function sendChat(text) {
   const eng = chatEl('chat-engine');
   if (eng) eng.textContent = chatState.mode === 'thinking' ? 'Thinking…' : 'Reading stored data…';
   try {
-    const r = await api('/api/chat', { method: 'POST', body: JSON.stringify({ question: q, mode: chatState.mode }) });
+    const r = await api('/api/chat', { method: 'POST', body: JSON.stringify({
+      question: q, mode: chatState.mode, context: chatState.context || undefined }) });
+    if (r.context) chatState.context = r.context;
     renderTurn({ role: 'atlas', text: r.text, engine: r.engine, kind: r.kind,
-      evidence: r.evidence, caveat: r.caveat, followUps: r.followUps });
+      evidence: r.evidence, caveat: r.caveat, followUps: r.followUps, blocks: r.blocks });
     if (eng) eng.textContent = r.engine === 'local-model' ? 'Answered by the local model'
       : r.engine === 'reference' ? 'Answered from the reference'
       : r.engine === 'nse' ? 'Answered from the NSE board'
@@ -3522,7 +3562,7 @@ function openThread(id) {
 async function bootChatGreeting() {
   try {
     const g = await api('/api/chat/greeting');
-    renderTurn({ role: 'atlas', text: g.text, engine: g.engine, kind: 'ready', followUps: g.followUps, noPersist: true });
+    renderTurn({ role: 'atlas', text: g.text, engine: g.engine, kind: 'ready', followUps: g.followUps, blocks: g.blocks, noPersist: true });
   } catch { /* the empty state explains itself */ }
 }
 
