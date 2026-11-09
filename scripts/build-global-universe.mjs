@@ -142,14 +142,17 @@ const indicesAll = otherBundle('indices.csv', (r) => ({
 }));
 // 82,371 index rows is 13 MB of mostly obscure series. Keep the ones whose name reads like a
 // national or sector benchmark, which is what a user actually looks up.
+// 82,371 index rows is 13 MB of mostly obscure series. Keep recognised national and sector
+// benchmarks: the ones a user actually looks up, and few enough to ship in the repository.
 const indices = indicesAll.filter((r) => {
   const name = r.n;
-  if (name.length > 70) return false;
-  // A benchmark reads like "NIFTY 50" or "S&P 500"; an obscure series carries a long code.
-  const benchmark = /(index|indices|composite|sensex|nifty|dow jones|s&p|nasdaq|ftse|dax|nikkei|hang seng|\bcac\b|tsx|asx|kospi|straits times|shanghai|bovespa|ipsa|merval|tadawul)/i.test(name);
-  const noisy = /\b(total return|net return|gross return|tr|nr|decrement|increment|leveraged|2x|3x|inverse)\b/i.test(name);
-  return benchmark && !noisy;
-});
+  if (name.length > 60) return false;
+  const noisy = /\b(total return|net return|gross return|decrement|increment|leveraged|inverse|\d+x\b|\btr\b|\bnr\b)/i.test(name);
+  if (noisy) return false;
+  // A headline benchmark: a named national index, or a broad composite.
+  const headline = /\b(nifty|sensex|s&p|standard & poor|dow jones|nasdaq|ftse|dax|nikkei|topix|hang seng|\bcac 40\b|\bdax\b|\bibex\b|\bsmi\b|\baex\b|\bomx\b|\bkospi|straits times|shanghai composite|shenzhen component|bovespa|ipsa|merval|tadawul|jakarta composite|set index|psei|klci|nzx 50|asx 200|tsx composite|tsx 60|bist 100|wig20|atx|psi 20|iseq|tel aviv|dfm|adx|egx 30|ngx|nse 20|masi|bv\b|bux|bet\b|moex|vn-index|dse|colombo|kosdaq|korea|taiwan|weighted|composite index)\b/i.test(name);
+  return headline;
+}).slice(0, 3000);
 
 const currencies = otherBundle('currencies.csv', (r) => ({
   s: r.symbol, n: r.name, sec: 'Currency', ind: 'Foreign exchange',
