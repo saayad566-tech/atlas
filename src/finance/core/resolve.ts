@@ -4,6 +4,7 @@
 // This is where that decision is made, and it refuses to guess — an unknown symbol returns
 // null rather than being filed under whatever market happens to be active.
 import fs from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import path from 'node:path';
 import { MARKETS } from './markets';
 import type { AssetClass } from './assets';
@@ -81,8 +82,14 @@ function bundle(kind: 'universe' | 'etfs', market: string): Map<string, BundleRo
   if (hit) return hit;
   const empty = new Map<string, BundleRow>();
   try {
-    const file = path.join(dataDir(kind), `${market}.json`);
-    const j = JSON.parse(fs.readFileSync(file, 'utf8')) as { companies?: BundleRow[]; etfs?: BundleRow[] };
+    // A large bundle ships compressed to fit the repository; accept either form.
+    const dir = dataDir(kind);
+    const plain = path.join(dir, `${market}.json`);
+    const gz = `${plain}.gz`;
+    const file = fs.existsSync(gz) ? gz : plain;
+    const raw = fs.readFileSync(file);
+    const text = file.endsWith('.gz') ? gunzipSync(raw).toString('utf8') : raw.toString('utf8');
+    const j = JSON.parse(text) as { companies?: BundleRow[]; etfs?: BundleRow[] };
     const rows = j.companies ?? j.etfs ?? [];
     const map = new Map<string, BundleRow>();
     for (const r of rows) map.set(r.s.toUpperCase(), r);

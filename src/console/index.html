@@ -165,6 +165,21 @@
       </div>
     </div>
 
+    <div class="section-h">News <span class="hint">live headlines, stored so past news stays searchable</span></div>
+    <div class="cards">
+      <div class="scorecard" style="grid-column: span 2">
+        <div class="t">NEWSWIRE</div>
+        <div class="d hint">Reads public feeds for the active market, deduplicates on the article link, and keeps everything it has seen.</div>
+        <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+          <button class="btn sm primary" id="newswire-run">Fetch today's news</button>
+          <input id="newswire-q" class="input sm" placeholder="Search stored news…" aria-label="Search news" />
+          <button class="btn sm" id="newswire-search">Search</button>
+        </div>
+        <div class="hint" id="newswire-status" style="margin-top:6px">Idle</div>
+        <div id="newswire-list" style="margin-top:8px"></div>
+      </div>
+    </div>
+
     <div class="section-h">Bulk backfill <span class="hint">history for many symbols, resumable — a second run skips what is already stored</span></div>
     <div class="cards">
       <div class="scorecard" style="grid-column: span 2">

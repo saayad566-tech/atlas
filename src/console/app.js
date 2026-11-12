@@ -647,6 +647,61 @@ async function stopBackfill() {
   await renderBackfillProgress(await api('/api/backfill/progress'));
 }
 
+
+// ---- The news pipeline ----------------------------------------------------
+function renderNews(items) {
+  const el = $('#newswire-list');
+  if (!el) return;
+  if (!items.length) { el.innerHTML = '<div class="hint">Nothing stored yet — fetch today\'s news.</div>'; return; }
+  el.innerHTML = items.slice(0, 20).map((n) => {
+    const when = (n.publishedAt || n.fetchedAt || '').slice(0, 10);
+    const title = esc(n.title);
+    const link = n.link ? `<a href="${esc(n.link)}" target="_blank" rel="noopener noreferrer">${title}</a>` : title;
+    return `<div style="padding:7px 0;border-bottom:1px solid var(--line)">
+      <div style="font-size:12.5px;line-height:1.45">${link}</div>
+      <div class="hint" style="font-size:10.5px;margin-top:2px">${when} · ${esc(n.source || 'unknown')}</div>
+    </div>`;
+  }).join('');
+}
+
+async function runNewswire() {
+  const status = $('#newswire-status');
+  if (status) status.textContent = 'Reading feeds…';
+  try {
+    const r = await api('/api/newswire/harvest', { method: 'POST', body: JSON.stringify({ limit: 120 }) });
+    if (status) {
+      status.textContent = r.stored > 0
+        ? `${r.stored} new articles · ${r.feedsOk}/${r.feedsTried} feeds answered`
+        : `No new articles · ${r.feedsOk}/${r.feedsTried} feeds answered`;
+    }
+    await loadNewswire();
+  } catch (e) { if (status) status.textContent = 'Could not reach the feeds'; }
+}
+
+async function loadNewswire() {
+  const el = $('#newswire-list');
+  try {
+    const r = await api('/api/newswire?limit=30');
+    renderNews(r.items || []);
+    const status = $('#newswire-status');
+    if (status && r.coverage) {
+      status.textContent = `${nf.format(r.coverage.total)} articles stored across ${r.coverage.markets} market(s)`
+        + (r.coverage.oldest ? `, oldest ${String(r.coverage.oldest).slice(0, 10)}` : '');
+    }
+  } catch { if (el) el.innerHTML = ''; }
+}
+
+async function searchNewswire() {
+  const q = ($('#newswire-q')?.value || '').trim();
+  const el = $('#newswire-list');
+  try {
+    const r = await api(`/api/newswire?limit=30${q ? '&q=' + encodeURIComponent(q) : ''}`);
+    renderNews(r.items || []);
+    const status = $('#newswire-status');
+    if (status) status.textContent = q ? `${r.items.length} results for "${q}"` : `${r.items.length} articles`;
+  } catch { if (el) el.innerHTML = ''; }
+}
+
 async function loadSession() {
   const el = $('#session-badge');
   if (!el) return;
@@ -3328,6 +3383,9 @@ function wire() {
   $('#scrape-refresh-rates').onclick = () => refreshLiveRates();
   $('#scrape-read-all').onclick = () => readAllSources();
   $('#history-run').onclick = () => runHistory();
+  $('#newswire-run').onclick = () => runNewswire();
+  $('#newswire-search').onclick = () => searchNewswire();
+  $('#newswire-q').onkeydown = (e) => { if (e.key === 'Enter') searchNewswire(); };
   $('#backfill-run').onclick = () => runBackfill();
   $('#backfill-more').onclick = () => continueBackfill();
   $('#backfill-stop').onclick = () => stopBackfill();
@@ -3355,7 +3413,7 @@ function wire() {
       if (v === 'intel') { loadIntel(); loadJobs(); loadTools(); loadAdmin(); loadUniverse(); loadMovers(); loadSectorBreadth();  loadSectors(); loadDiscover(); loadAdvisors(); loadNewsroom(); }
       if (v === 'store') { loadStore(); loadModels(); }
       if (v === 'macro') loadMacro();
-      if (v === 'settings') { loadSettings(); loadCarryRates(); loadScrapeSources(); }
+      if (v === 'settings') { loadSettings(); loadCarryRates(); loadScrapeSources(); loadNewswire(); }
     if (v === 'library') initLibrary();
     if (v === 'chat') setTimeout(() => chatEl('chat-input')?.focus(), 60);
     };

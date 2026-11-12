@@ -53,6 +53,7 @@ import { addEntry, listJournal, closeEntry, journalScorecard } from '../core/jou
 import { trendingSectors, rankCandidates, peerPercentiles } from '../core/discover';
 import { metricHistory, earningsSurprises, backfillSymbol, historySummary, actionsFor } from '../core/history';
 import { startBackfill, stepBackfill, progress as backfillProgress, recentBackfill, cancelBackfill } from '../core/backfill';
+import { harvest, search, coverage as newsStoreCoverage, prune, harvestSymbol, forSymbol } from '../core/newswire';
 import { loadSeries, backtest } from '../core/backtest';
 import { corporateTimeline, insiderFlows } from '../core/corporate';
 import { companyTruth, marketTruth } from '../core/datatruth';
@@ -2254,6 +2255,43 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
         if (!country) return json(res, 400, { error: 'No market selected.' });
         const r = await fetchWorldBank(db.db, country);
         return json(res, 200, { ...r, country });
+      }
+
+      // ---- the news pipeline ----
+      if (p === '/api/newswire/harvest' && req.method === 'POST') {
+        const b = (await readBody(req)) as { market?: string; limit?: number };
+        const market = String(b.market ?? markets.active() ?? 'IN');
+        return json(res, 200, await harvest(db.db, market, { limit: b.limit ?? 120 }));
+      }
+      if (p === '/api/newswire' || p === '/api/newswire/search') {
+        const market = url.searchParams.get('market') ?? undefined;
+        const text = url.searchParams.get('q') ?? undefined;
+        const from = url.searchParams.get('from') ?? undefined;
+        const to = url.searchParams.get('to') ?? undefined;
+        const limit = Number(url.searchParams.get('limit') ?? 50);
+        return json(res, 200, {
+          items: search(db.db, { ...(market ? { market } : {}), ...(text ? { text } : {}),
+            ...(from ? { from } : {}), ...(to ? { to } : {}), limit }),
+          coverage: newsStoreCoverage(db.db),
+        });
+      }
+      if (p === '/api/newswire/coverage') return json(res, 200, newsStoreCoverage(db.db));
+      if (p.startsWith('/api/newswire/symbol/')) {
+        const sym = decodeURIComponent(p.replace('/api/newswire/symbol/', ''));
+        if (url.searchParams.get('harvest') === '1') {
+          let name = sym;
+          try {
+            const row = db.db.prepare('SELECT name FROM companies WHERE symbol = ?').get(sym) as { name: string } | undefined;
+            if (row) name = row.name;
+          } catch { /* use the symbol */ }
+          const r = await harvestSymbol(db.db, sym, name);
+          return json(res, 200, { ...r, items: forSymbol(db.db, sym, 20) });
+        }
+        return json(res, 200, { items: forSymbol(db.db, sym, 30) });
+      }
+      if (p === '/api/newswire/prune' && req.method === 'POST') {
+        const b = (await readBody(req)) as { keepDays?: number };
+        return json(res, 200, { removed: prune(db.db, b.keepDays ?? 180) });
       }
 
       // ---- bulk backfill: history for many symbols, resumable ----

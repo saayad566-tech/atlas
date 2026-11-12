@@ -1,6 +1,6 @@
 # Atlas — Full Product Requirements and Delivery Report
 
-**Version 3.13.0** · 9 November 2026 · Status: as-built
+**Version 3.14.0** · 13 November 2026 · Status: as-built
 **This document supersedes `docs/PRD.md`.** It covers what Atlas is, what works, what does
 not, and the status of every instruction given during the build.
 
@@ -309,6 +309,25 @@ P/E was never known.
 | `coffee-gut` | both checklists against their source documents |
 
 ---
+
+### 2.9 News pipeline
+
+A news store that keeps what it reads. One harvest queries public RSS feeds for the active
+market, parses RSS or Atom without a dependency, deduplicates on the article link, and stores
+every article with both its publication date and the date it was seen. Because the store
+persists, **past news stays searchable after the feed has moved on** — which a live-only
+reader cannot do.
+
+| Capability | Endpoint |
+|---|---|
+| Harvest the active market | `POST /api/newswire/harvest` |
+| Read stored news, filtered | `GET /api/newswire?market=&q=&from=&to=` |
+| Coverage: how much, over what span | `GET /api/newswire/coverage` |
+| News about one company | `GET /api/newswire/symbol/:symbol?harvest=1` |
+| Prune old articles | `POST /api/newswire/prune` |
+
+Verified live: 100 articles seen, 40 stored, a second harvest storing 0 — dedupe holds.
+Search and date filters work; a cutoff before the stored span returns nothing.
 
 ## Part 5 — Non-functional requirements
 
