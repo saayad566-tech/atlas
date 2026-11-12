@@ -1202,7 +1202,7 @@ function renderCompany() {
   loadNote(co.symbol);
   researchPrompt(co.symbol);
   $('#btn-research').onclick = () => loadResearch(co.symbol);
-  loadMore(co.symbol);
+  loadCompanyMore(co.symbol);
   loadNews(co.symbol);
   $('#co-audit').hidden = true;
 
@@ -1540,6 +1540,51 @@ async function savePrefs(patch) {
   catch (e) { toastNote(e.message); }
 }
 
+/**
+ * A modal dialog.
+ *
+ * Resolves when the user confirms, cancels, presses Escape or clicks the backdrop, so a
+ * caller can await the answer instead of wiring its own state.
+ */
+function openModal({ title, desc, bodyHtml, okLabel = 'Done', cancelLabel = 'Cancel', onOk }) {
+  const root = document.getElementById('modal-root');
+  if (!root) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    root.innerHTML = `
+      <div class="modalscrim" data-close="1"></div>
+      <div class="modalbox" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+        <div class="modalhead">
+          <div class="modaltitle">${esc(title)}</div>
+          ${desc ? `<div class="hint">${esc(desc)}</div>` : ''}
+        </div>
+        <div class="modalbody">${bodyHtml}</div>
+        <div class="modalfoot">
+          <button class="btn sm ghost" data-close="1">${esc(cancelLabel)}</button>
+          <button class="btn sm primary" data-ok="1">${esc(okLabel)}</button>
+        </div>
+      </div>`;
+    root.hidden = false;
+
+    const close = async (confirmed) => {
+      root.hidden = true;
+      root.innerHTML = '';
+      document.removeEventListener('keydown', onKey);
+      if (confirmed && onOk) { try { await onOk(); } catch { /* the caller reports */ } }
+      resolve(confirmed);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); close(false); }
+      if (e.key === 'Enter' && e.target?.tagName !== 'TEXTAREA') { e.preventDefault(); close(true); }
+    };
+    root.querySelectorAll('[data-close]').forEach((b) => { b.onclick = () => close(false); });
+    const ok = root.querySelector('[data-ok]');
+    if (ok) ok.onclick = () => close(true);
+    document.addEventListener('keydown', onKey);
+    const first = root.querySelector('button, input, select, textarea');
+    if (first) first.focus();
+  });
+}
+
 function openColumnsModal() {
   const all = state.allColumns.length ? state.allColumns : (state.prefs.columns || []);
   const label = (k) => (RESULT_COLS.find((c) => c.key === k) || { label: k }).label;
@@ -1727,8 +1772,10 @@ async function loadIntel() {
 
 // ---- more intelligence, news, compare, correlation, jobs, tools --------------
 
-async function loadMore(symbol) {
+// Named distinctly: a second `loadMore` shadowed the screener's pagination and broke it.
+async function loadCompanyMore(symbol) {
   const el = $('#co-more');
+  if (!el || !symbol) return;
   el.innerHTML = '<p class="hint">Loading…</p>';
   const safe = async (path, fallback) => { try { return await api(path); } catch { return fallback; } };
   const [ex, inv, rk, tr, er, pr, st, val1] = await Promise.all([

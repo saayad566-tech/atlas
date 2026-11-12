@@ -450,12 +450,12 @@
     <div id="alerts" class="alerts"></div>
     <div class="section-h">Your alert rules <span class="hint">metric · operator · threshold</span></div>
     <div class="importbox"><div class="row">
-      <select class="input" id="rule-metric" style="max-width:180px">
+      <select class="input" id="rule-metric" aria-label="Filter field" style="max-width:180px">
         <option value="pe">P/E</option><option value="roe">ROE</option><option value="roce">ROCE</option><option value="opm">OPM</option>
         <option value="debt_to_equity">Debt/Equity</option><option value="pledge">Pledged</option><option value="promoter_holding">Promoter holding</option>
         <option value="sales_growth_3y">Sales growth 3Y</option><option value="market_cap">Market cap</option><option value="current_ratio">Current ratio</option>
       </select>
-      <select class="input" id="rule-op" style="max-width:90px"><option>&gt;</option><option>&lt;</option><option>&gt;=</option><option>&lt;=</option></select>
+      <select class="input" id="rule-op" aria-label="Comparison" style="max-width:90px"><option>&gt;</option><option>&lt;</option><option>&gt;=</option><option>&lt;=</option></select>
       <input class="input" id="rule-threshold" type="number" placeholder="Threshold" style="max-width:130px" aria-label="Alert threshold" />
       <button class="btn primary" id="btn-rule-add">Add rule</button>
     </div></div>
@@ -635,5 +635,6 @@
   </div>
 </div><!-- /.main -->
 </div><!-- /.shell -->
+<div id="modal-root" hidden></div>
 </body>
 </html>

@@ -900,8 +900,11 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
       }
       if (p === '/api/store/install' && req.method === 'POST') {
         const b = (await readBody(req)) as { id?: string; path?: string };
-        const r = aiStore.install(db.db, String(b.id ?? ''), b.path ? String(b.path) : undefined);
-        return json(res, r.ok ? 200 : 409, r);
+        const id = String(b.id ?? '').trim();
+        // A 409 with no reason leaves the user with a dead end, so say which input is missing.
+        if (!id) return json(res, 400, { error: 'Choose a model to install.' });
+        const r = aiStore.install(db.db, id, b.path ? String(b.path) : undefined);
+        return json(res, r.ok ? 200 : 409, r.ok ? r : { ...r, error: (r as { error?: string }).error ?? 'That model could not be installed.' });
       }
       if (p === '/api/store/uninstall' && req.method === 'POST') {
         const b = (await readBody(req)) as { id?: string };
@@ -2301,7 +2304,8 @@ export function createServer(initialDb: Db, consoleDir: string, dataDir?: string
         if (!list.length) {
           // No list given: take the largest companies in the active market.
           try {
-            list = (db.db.prepare('SELECT symbol FROM companies ORDER BY market_cap DESC LIMIT 50').all() as Array<{ symbol: string }>)
+            // Market cap lives in the materialised metrics table, not on companies.
+            list = (db.db.prepare('SELECT symbol FROM latest_metrics ORDER BY market_cap DESC LIMIT 50').all() as Array<{ symbol: string }>)
               .map((r) => r.symbol);
           } catch { list = []; }
         }

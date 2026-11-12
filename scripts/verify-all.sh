@@ -26,6 +26,7 @@ run deep      verify-deep.js
 run universe  verify-universe.js
 run pipeline  verify-pipeline.js
 run newswire  verify-newswire.js
+run ui-audit  verify-ui-audit.js
 run ui        verify-ui.js
 run prod      verify-prod.js
 run import    verify-import.js
