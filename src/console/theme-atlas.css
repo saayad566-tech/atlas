@@ -1,0 +1,246 @@
+/* ===========================================================================
+   Atlas UI — the adopted visual language
+   Ported from the supplied Atlas.html design. It overrides the token values and
+   the shell surfaces only, so every existing component rule keeps working and
+   all 77 wired buttons stay intact.
+
+   Dark first: the palette is a deep near-black with an iris-to-mint accent, glass
+   surfaces, and a soft aurora behind the content.
+   =========================================================================== */
+
+:root {
+  --font-sans: "Inter", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --bg-0: #06070b; --bg-1: #0a0c12; --bg-2: #0e1118; --bg-3: #141824;
+
+  /* Surfaces, remapped onto the names the components already use */
+  --surface-0: var(--bg-0);
+  --surface-1: #0d1017;
+  --surface-2: rgba(255,255,255,.045);
+  --surface-3: rgba(255,255,255,.07);
+  --surface-inset: rgba(255,255,255,.025);
+
+  --line-soft: rgba(255,255,255,.055);
+  --line: rgba(255,255,255,.085);
+  --line-strong: rgba(255,255,255,.15);
+
+  --ink-1: #e9edf6;
+  --ink-2: #a7b0c4;
+  --ink-3: #7d8698;
+  --ink-4: #5d6577;
+
+  --brand: #7c6bff;
+  --brand-ink: #ffffff;
+  --brand-soft: rgba(124,107,255,.16);
+  --iris: #7c6bff; --iris-2: #9d8cff; --mint: #41dcc0; --sky: #5ec8ff;
+  --amber: #ffb454; --rose: #ff6b81;
+
+  --positive: #41dcc0;
+  --positive-soft: rgba(65,220,192,.14);
+  --caution: #ffb454;
+  --caution-soft: rgba(255,180,84,.14);
+  --negative: #ff6b81;
+  --negative-soft: rgba(255,107,129,.14);
+  --info: #5ec8ff;
+  --info-soft: rgba(94,200,255,.14);
+
+  --grad: linear-gradient(135deg, #7c6bff 0%, #56b8ff 48%, #41dcc0 100%);
+  --grad-soft: linear-gradient(135deg, rgba(124,107,255,.22), rgba(65,220,192,.14));
+  --shadow-1: 0 1px 0 rgba(255,255,255,.04) inset, 0 12px 32px -18px rgba(0,0,0,.9);
+  --shadow-2: 0 1px 0 rgba(255,255,255,.05) inset, 0 24px 60px -30px rgba(0,0,0,.95);
+  --radius-md: 12px; --radius-lg: 16px;
+
+  color-scheme: dark;
+}
+
+/* The light theme stays available and legible; it is no longer the default. */
+[data-theme="light"] {
+  --bg-0: #f7f8fb; --bg-1: #ffffff; --bg-2: #f1f3f8; --bg-3: #e8ecf4;
+  --surface-0: var(--bg-0);
+  --surface-1: #ffffff;
+  --surface-2: #f2f4f9;
+  --surface-3: #e9edf5;
+  --surface-inset: #f8fafc;
+  --line-soft: #e8ecf3;
+  --line: #dbe1ea;
+  --line-strong: #c2cad6;
+  --ink-1: #0f1720;
+  --ink-2: #414d5c;
+  --ink-3: #67717f;
+  --ink-4: #939dab;
+  --brand: #5b4bd6;
+  --brand-soft: #ece9ff;
+  color-scheme: light;
+}
+
+/* ---- The page itself ------------------------------------------------------ */
+html, body { background: var(--bg-0); color: var(--ink-1); font-family: var(--font-sans); }
+body { position: relative; }
+
+/* A soft aurora behind everything. Fixed, non-interactive, and reduced to a
+   single static wash when the user prefers reduced motion. */
+.aurora {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; opacity: .85;
+}
+.aurora span {
+  position: absolute; display: block; border-radius: 50%; filter: blur(90px);
+}
+.aurora span:nth-child(1) {
+  width: 52vw; height: 52vw; left: -12vw; top: -18vw;
+  background: radial-gradient(circle, rgba(124,107,255,.30), transparent 68%);
+  animation: drift1 26s ease-in-out infinite alternate;
+}
+.aurora span:nth-child(2) {
+  width: 46vw; height: 46vw; right: -10vw; top: 6vh;
+  background: radial-gradient(circle, rgba(65,220,192,.20), transparent 68%);
+  animation: drift2 32s ease-in-out infinite alternate;
+}
+.aurora span:nth-child(3) {
+  width: 40vw; height: 40vw; left: 28vw; bottom: -20vh;
+  background: radial-gradient(circle, rgba(94,200,255,.16), transparent 70%);
+  animation: drift3 38s ease-in-out infinite alternate;
+}
+@keyframes drift1 { to { transform: translate3d(6vw, 4vh, 0) scale(1.12); } }
+@keyframes drift2 { to { transform: translate3d(-5vw, 6vh, 0) scale(1.08); } }
+@keyframes drift3 { to { transform: translate3d(4vw, -5vh, 0) scale(1.15); } }
+@media (prefers-reduced-motion: reduce) {
+  .aurora span { animation: none !important; }
+}
+
+/* A faint grain so large flat areas do not band. */
+.grain {
+  position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: .03;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+}
+
+/* Content sits above both layers. */
+.shell, .topbar, .lock, #modal-root { position: relative; z-index: 2; }
+
+/* ---- Shell ---------------------------------------------------------------- */
+.topbar {
+  background: linear-gradient(180deg, rgba(10,12,18,.92), rgba(10,12,18,.72));
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border-bottom: 1px solid var(--line);
+}
+.nav {
+  background: linear-gradient(180deg, rgba(255,255,255,.028), rgba(255,255,255,.008));
+  border-right: 1px solid var(--line);
+  backdrop-filter: blur(10px);
+}
+
+/* The brand mark becomes the gradient tile from the design. */
+.brand .logo {
+  background: var(--grad);
+  color: #06070b;
+  font-weight: 800;
+  box-shadow: 0 6px 18px -8px rgba(124,107,255,.9);
+}
+
+/* ---- Navigation ----------------------------------------------------------- */
+.navbtn {
+  border-radius: 9px; color: var(--ink-2);
+  transition: background .18s var(--ease, ease), color .18s var(--ease, ease);
+}
+.navbtn:hover { background: rgba(255,255,255,.05); color: var(--ink-1); }
+.navbtn.active {
+  background: var(--brand-soft);
+  color: var(--iris-2);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(124,107,255,.28);
+}
+.navgroup-label { color: var(--ink-4); letter-spacing: .1em; }
+
+/* ---- Cards and surfaces --------------------------------------------------- */
+.scorecard, .card, .panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+  backdrop-filter: blur(8px);
+}
+.scorecard:hover { border-color: var(--line-strong); }
+
+/* ---- Chat ----------------------------------------------------------------- */
+.bubble {
+  background: rgba(255,255,255,.04);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  color: var(--ink-1);
+}
+.msg.user .bubble {
+  background: var(--grad-soft);
+  border-color: rgba(124,107,255,.34);
+  color: var(--ink-1);
+  border-bottom-right-radius: 6px;
+}
+.msg.atlas .avatar { background: var(--grad); color: #06070b; }
+.chatcompose { background: linear-gradient(180deg, transparent, rgba(10,12,18,.9) 30%); border-top: 1px solid var(--line-soft); }
+.chatinput {
+  background: rgba(255,255,255,.035);
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  color: var(--ink-1);
+}
+.chatinput:focus {
+  border-color: rgba(124,107,255,.6);
+  box-shadow: 0 0 0 4px rgba(124,107,255,.14);
+}
+.segmented { background: rgba(255,255,255,.04); border: 1px solid var(--line); }
+.segbtn.active { background: var(--grad-soft); color: var(--iris-2); box-shadow: none; }
+.followups button { background: rgba(255,255,255,.04); border-color: var(--line); color: var(--ink-2); }
+.followups button:hover { border-color: rgba(124,107,255,.5); color: var(--iris-2); }
+
+/* ---- Controls ------------------------------------------------------------- */
+.btn {
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.04);
+  color: var(--ink-1);
+  transition: background .16s ease, border-color .16s ease, transform .12s ease;
+}
+.btn:hover { background: rgba(255,255,255,.07); border-color: var(--line-strong); }
+.btn.primary {
+  background: var(--grad); border-color: transparent; color: #06070b; font-weight: 650;
+  box-shadow: 0 10px 26px -14px rgba(124,107,255,.9);
+}
+.btn.primary:hover { filter: brightness(1.06); }
+.btn.ghost { background: transparent; }
+.input, select.input, textarea.input {
+  background: rgba(255,255,255,.035);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink-1);
+}
+.input:focus { border-color: rgba(124,107,255,.55); box-shadow: 0 0 0 3px rgba(124,107,255,.12); }
+.chip { background: rgba(255,255,255,.05); border: 1px solid var(--line); color: var(--ink-2); }
+
+/* ---- Tables --------------------------------------------------------------- */
+table { border-color: var(--line); }
+th { background: rgba(255,255,255,.045); color: var(--ink-2); }
+td { border-color: var(--line-soft); }
+tr:nth-child(even) td { background: rgba(255,255,255,.018); }
+
+/* ---- A gradient hairline on the active card, as in the design ------------- */
+.scorecard.hero { border-color: rgba(124,107,255,.35); box-shadow: var(--shadow-2); }
+
+/* ---- Grouped navigation --------------------------------------------------- */
+.navgroup { display: flex; flex-direction: column; gap: 1px; margin-bottom: 12px; }
+.navgroup-label {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-4); padding: 2px 12px 5px;
+}
+.navgroup-tools { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+.navtools { display: flex; flex-wrap: wrap; gap: 5px; padding: 7px 4px 0; }
+.navtools .input.sm { flex: 1 1 100%; max-width: none; }
+.navtools .btn.sm { flex: 0 0 auto; }
+.navtools .chip { flex: 0 0 auto; }
+
+@media (max-width: 900px) {
+  .navgroup { flex-direction: row; flex-wrap: nowrap; margin-bottom: 0; }
+  .navgroup-label { display: none; }
+  .navgroup-tools { margin-left: auto; border-top: 0; padding-top: 0; }
+  .navtools { flex-wrap: nowrap; padding: 0; }
+  .navtools .input.sm { flex: 0 0 auto; max-width: 130px; }
+}

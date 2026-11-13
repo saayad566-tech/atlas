@@ -25,7 +25,10 @@ console.log('\n=== EVERY CLASS THE MARKUP USES IS STYLED ===');
 const html=fs.readFileSync('src/console/index.html','utf8');
 const used=new Set();
 for (const m of html.matchAll(/class="([^"]+)"/g)) for (const c of m[1].split(/\s+/)) if (c) used.add(c);
-const styled=new Set([...css.matchAll(/\.([a-z][a-z0-9_-]*)/g)].map(m=>m[1]));
+const themePath=path.join(process.cwd(),'src','console','theme-atlas.css');
+const themeCss=fs.existsSync(themePath)?fs.readFileSync(themePath,'utf8'):'';
+const styled=new Set([...css.matchAll(/\.([a-z][a-z0-9_-]*)/g)].map(m=>m[1])
+  .concat([...themeCss.matchAll(/\.([a-z][a-z0-9_-]*)/g)].map(m=>m[1])));
 const unstyled=[...used].filter(c=>!styled.has(c) && !/^(active|hidden|demo|sm|xs|lg|primary|ghost|l|big|mono|row)$/.test(c));
 ok('no class is left unstyled', unstyled.length===0, unstyled.slice(0,6).join(',')||`${used.size} classes`);
 
@@ -39,7 +42,15 @@ ok('no class is left unstyled', unstyled.length===0, unstyled.slice(0,6).join(',
   const br=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/usr/local/bin/chromium',args:['--no-sandbox']});
 
   console.log('\n=== DARK MODE ACTUALLY THEMES (measured) ===');
+  // The app now drives its own theme preference rather than following the OS, so the test
+  // sets the preference through the API and measures the result.
+  const setTheme=async(theme)=>{
+    // PUT, and the body is the prefs object itself rather than a wrapper.
+    await fetch(`${base}/api/fin/api/prefs`,{method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({theme})}).catch(()=>{});
+  };
   const read=async(scheme)=>{
+    await setTheme(scheme);
     const pg=await br.newPage({viewport:{width:1440,height:900},bypassCSP:true,colorScheme:scheme});
     await pg.goto(base,{waitUntil:'networkidle'});
     await pg.waitForFunction(()=>document.querySelectorAll('#result-body tr').length>2,{timeout:20000}).catch(()=>{});
@@ -52,7 +63,7 @@ ok('no class is left unstyled', unstyled.length===0, unstyled.slice(0,6).join(',
   };
   const light=await read('light');
   const dark=await read('dark');
-  ok('the page background changes', light.body!==dark.body, `${light.body} → ${dark.body}`);
+  ok('the page background changes on a theme switch', light.body!==dark.body, `${light.body} → ${dark.body}`);
   ok('the ink changes', light.ink!==dark.ink, `${light.ink} → ${dark.ink}`);
   ok('cards change', light.card!==dark.card, `${light.card} → ${dark.card}`);
   ok('table headers change', light.th!==dark.th, `${light.th} → ${dark.th}`);

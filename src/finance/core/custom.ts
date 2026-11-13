@@ -16,7 +16,7 @@ export interface Prefs {
 }
 
 export const DEFAULT_PREFS: Prefs = {
-  theme: 'light', density: 'comfortable', columns: [...DEFAULT_COLUMNS],
+  theme: 'dark', density: 'comfortable', columns: [...DEFAULT_COLUMNS],
   panels: { scores: true, deep: true, factors: true, valuation: true, strength: true, intel: true },
   limit: 100, currency: 'INR',
 };

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -15,8 +15,11 @@
 <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
 <link rel="apple-touch-icon" href="./icons/icon-192.png" />
 <link rel="stylesheet" href="./styles.css" />
+<link rel="stylesheet" href="theme-atlas.css" />
 </head>
 <body>
+<div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+<div class="grain" aria-hidden="true"></div>
   <div id="net-banner" class="netbanner" hidden role="alert">
     <span id="net-msg">Connection problem.</span>
     <button class="btn sm" id="net-retry" hidden>Retry</button>
@@ -81,13 +84,13 @@
 <div class="main">
 <header class="topbar">
   <button class="btn ghost navtoggle" id="nav-toggle" aria-label="Menu" aria-expanded="false">☰</button>
-  <div class="brand"><span class="logo">S</span><span>Sift</span><small>local screener</small></div>
+  <div class="brand"><span class="logo">A</span><span>Atlas</span><small>local intelligence</small></div>
   <div class="searchwrap">
     <input id="search" class="search" type="search" placeholder="Search a company or symbol…  ( / )" autocomplete="off" aria-label="Search companies" />
     <div id="hits" class="hits" hidden></div>
   </div>
   <div class="spacer"></div>
-  <button class="btn sm ghost" id="btn-theme" title="Toggle theme" aria-label="Toggle theme">◐</button>
+  <button class="btn sm ghost" id="btn-theme" title="Toggle theme" aria-label="Toggle theme"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg></button>
   <span class="chip" id="dataset-chip" title="Where the data comes from">…</span>
 </header>
 
@@ -111,8 +114,8 @@
         <div class="chatrow">
           <textarea id="chat-input" class="chatinput" rows="1" placeholder="Ask about a company, the market, or any term…" aria-label="Your question"></textarea>
           <input type="file" id="chat-file" accept=".txt,.md,.markdown,.csv,.json" hidden aria-label="Attach a text file" />
-          <button class="btn ghost" id="chat-attach" aria-label="Attach a file" title="Attach a text file">📎</button>
-          <button class="btn ghost" id="chat-mic" aria-label="Voice input" title="Speak your question">🎤</button>
+          <button class="btn ghost" id="chat-attach" aria-label="Attach a file" title="Attach a text file"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.05l-9.19 9.19a5.5 5.5 0 01-7.78-7.78l9.19-9.19a3.5 3.5 0 014.95 4.95l-9.2 9.19a1.5 1.5 0 01-2.12-2.12l8.49-8.48"/></svg></button>
+          <button class="btn ghost" id="chat-mic" aria-label="Voice input" title="Speak your question"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0014 0v-1M12 18v4"/></svg></button>
           <button class="btn primary" id="chat-send" aria-label="Send">Send</button>
         </div>
         <div class="hint chatsmall">Everything runs on this device. Atlas will not invent a number it cannot trace.</div>

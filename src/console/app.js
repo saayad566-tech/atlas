@@ -12,7 +12,7 @@ const FIN = '/api/fin';
 const WSP = '/api/ws';
 
 const state = {
-  prefs: { theme: 'light', density: 'comfortable', columns: [], panels: {} },
+  prefs: { theme: 'dark', density: 'comfortable', columns: [], panels: {} },
   rows: [], total: 0, offset: 0, limit: 100,
   expression: '', sort: 'market_cap', order: 'desc',
   company: null, tab: 'annual',

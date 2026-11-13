@@ -1,7 +1,7 @@
 import { cpSync, mkdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 mkdirSync('dist/console/icons', { recursive: true });
-for (const f of ['index.html', 'styles.css', 'app.js', 'manifest.json', 'service-worker.js']) {
+for (const f of ['index.html', 'styles.css', 'theme-atlas.css', 'app.js', 'manifest.json', 'service-worker.js']) {
   cpSync(`src/console/${f}`, `dist/console/${f}`);
 }
 for (const f of ['icon-192.png', 'icon-512.png']) {
